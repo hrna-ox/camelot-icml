@@ -55,17 +55,23 @@ class MLP(Layer):
     Params:
     - output_dim : int, dimensionality of output space for each sub-sequence.
     - hidden_layers : int, Number of "hidden" feedforward layers. (default = 2)
-    - hidden_nodes : int, For "hidden" feedforward layers, the dimensionality of the output space. (default = 30)
-    - activation_fn : str/fn, The activation function to use. (default = 'sigmoid')
-    - output_fn : str/fn, The activation function on the output of the MLP. (default = 'softmax').
-    - dropout : float, dropout rate to be used on layer computation (default = 0.6).
-    - regulariser_params : tuple of floats indicating regularization. (default = (0.01, 0.01))
+    - hidden_nodes : int, For "hidden" feedforward layers, the dimensionality 
+                        of the output space. (default = 30)
+    - activation_fn : str/fn, The activation function to use. 
+                        (default = 'sigmoid')
+    - output_fn : str/fn, The activation function on the output of the MLP. 
+                        (default = 'softmax').
+    - dropout : float, dropout rate (default = 0.6).
+    - regulariser_params : tuple of floats for regularization (default = (0.01, 0.01))
     - seed : int, Seed used for random mechanisms (default = 4347)
     - name : str, name on which to save layer. (defult = 'decoder')
     """
 
-    def __init__(self, output_dim, hidden_layers=2, hidden_nodes=30, activation_fn='sigmoid',
-                 output_fn='softmax', dropout=0.6, regulariser_params=(0.01, 0.01), seed=4347, name='decoder'):
+    def __init__(self, output_dim: int, hidden_layers: int = 2, 
+                 hidden_nodes: int  = 30, activation_fn = 'sigmoid', 
+                 output_fn='softmax', dropout: float = 0.6,
+                 regulariser_params = (0.01, 0.01), seed: int = 4347, 
+                 name: float = 'MLP'):
 
         # Block parameters
         super().__init__(name=name)
@@ -74,16 +80,25 @@ class MLP(Layer):
         self.hidden_nodes = hidden_nodes
         self.activation_fn = activation_fn
         self.output_fn = output_fn
+        
+        # Regularization params
         self.dropout = dropout
+        self.regulariser = mix_l1_l2_reg(regulariser_params)
+        
+        # Seed
         self.seed = seed
 
-        l1_param, l2_param = regulariser_params
-        self.regulariser = mix_l1_l2_reg(l1_param, l2_param)
 
-        # Add intermediate layers
+
+        # Add intermediate layers to the model
         for layer_id_ in range(self.hidden_layers):
-            layer_ = Dense(units=self.hidden_nodes, activation=self.activation_fn,
-                           kernel_regularizer=self.regulariser, activity_regularizer=self.regulariser)
+            
+            # Add Dense layer to model
+            layer_ = Dense(units=self.hidden_nodes, 
+                           activation=self.activation_fn,
+                           kernel_regularizer=self.regulariser,
+                           activity_regularizer=self.regulariser)
+            
             self.__setattr__('layer_' + str(layer_id_), layer_)
 
         # Input and Output layers
