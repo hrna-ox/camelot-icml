@@ -316,7 +316,7 @@ class FeatTimeAttention(Layer):
 
         # Update configuration
         config.update({f"{self.name}-units": self.units,
-                       f"{self.name}-activation": self.activation)
+                       f"{self.name}-activation": self.activation})
 
         return config
 
@@ -326,21 +326,21 @@ class LSTMEncoder(Layer):
         Class for a stacked LSTM layer architecture.
 
         Params:
-        - latent_dim          : dimensionality of latent space for each sub-sequence. (default = 32)
-        - hidden_layers       : Number of "hidden"/intermediate LSTM layers.  (default = 1)
-        - hidden_nodes        : For hidden LSTM layers, the dimensionality of the intermediate state. (default = 32)
-        - state_fn            : The activation function to use on cell state/output. (default = 'tanh')
-        - recurrent_activation: The activation function to use on forget/input/output gates. (default = 'sigmoid')
-        - return_sequences    : Indicates if returns sequence of states on the last layer (default = False)
-        - dropout             : dropout rate to be used on cell state/output computation. (default = 0.6)
-        - recurrent_dropout   : dropout rate to be used on forget/input/output gates. (default = 0.0)
+        - latent_dim : dimensionality of latent space for each sub-sequence. (default = 32)
+        - hidden_layers : Number of "hidden"/intermediate LSTM layers.  (default = 1)
+        - hidden_nodes : For hidden LSTM layers, the dimensionality of the intermediate state. (default = 20)
+        - state_fn : The activation function to use on cell state/output. (default = 'tanh')
+        - recurrent_activation : The activation function to use on forget/input/output gates. (default = 'sigmoid')
+        - return_sequences : Indicates if returns sequence of states on the last layer (default = False)
+        - dropout : dropout rate to be used on cell state/output computation. (default = 0.6)
+        - recurrent_dropout : dropout rate to be used on forget/input/output gates. (default = 0.0)
         - regulariser_params :  tuple of floats indicating l1_l2 regularisation. (default = (0.01, 0.01))
-        - name                : Name on which to save component. (default = 'encoder')
+        - name : Name on which to save component. (default = 'LSTM_Encoder')
     """
 
-    def __init__(self, latent_dim=32, hidden_layers=1, hidden_nodes=20, state_fn="tanh", recurrent_fn="sigmoid",
-                 regulariser_params=(0.01, 0.01), return_sequences=False, dropout=0.6, recurrent_dropout=0.0,
-                 name='LSTM_enc'):
+    def __init__(self, latent_dim: int = 32, hidden_layers: int = 1, hidden_nodes: int = 20, state_fn="tanh",
+                 recurrent_fn="sigmoid", regulariser_params: tuple = (0.01, 0.01), return_sequences: bool = False,
+                 dropout: float = 0.6, recurrent_dropout: float = 0.0, name: str = 'LSTM_Encoder'):
 
         # Block Parameters
         super().__init__(name=name)
@@ -350,13 +350,12 @@ class LSTMEncoder(Layer):
         self.state_fn = state_fn
         self.recurrent_fn = recurrent_fn
         self.return_sequences = return_sequences
+
+        # Regularisation Params
         self.dropout = dropout
         self.recurrent_dropout = recurrent_dropout
-
-        # Regulariser info
         self.regulariser_params = regulariser_params
-        l1_param, l2_param = regulariser_params
-        self.regulariser = mix_l1_l2_reg(l1_param, l2_param)
+        self.regulariser = mix_l1_l2_reg(regulariser_params)
 
         # Add Intermediate Layers
         for layer_id_ in range(self.hidden_layers):
@@ -393,52 +392,86 @@ class LSTMEncoder(Layer):
 
     def get_config(self):
         """Update configuration for layer."""
+
+        # Load existing configuration
         config = super().get_config().copy()
-        config.update({"latent_dim": self.latent_dim, "hidden_layers": self.hidden_layers,
-                       "hidde_nodes": self.hidden_nodes, "state_fn": self.state_fn,
-                       "recurrent_fn": self.recurrent_fn, "return_sequences": self.return_sequences,
-                       "dropout": self.dropout, "recurrent_dropout": self.recurrent_dropout,
-                       "regulariser_params": self.regulariser_params})
+
+        # Update configuration
+        config.update({f"{self.name}-latent_dim": self.latent_dim,
+                       f"{self.name}-hidden_layers": self.hidden_layers,
+                       f"{self.name}-hidden_nodes": self.hidden_nodes,
+                       f"{self.name}-state_fn": self.state_fn,
+                       f"{self.name}-recurrent_fn": self.recurrent_fn,
+                       f"{self.name}-return_sequences": self.return_sequences,
+                       f"{self.name}-dropout": self.dropout,
+                       f"{self.name}-recurrent_dropout": self.recurrent_dropout,
+                       f"{self.name}-regulariser_params": self.regulariser_params})
 
         return config
 
 
 class AttentionRNNEncoder(LSTMEncoder):
     """
-        Class for an Attention RNN Encoder architecture.
-
-        Params:
-    units: int, dimensionality of projection/latent space.
-    activation: str/fn, the activation function to use. (default = "relu")
+        Class for an Attention RNN Encoder architecture. Class builds on LSTM Encoder class.
     """
 
     def __init__(self, units, activation="linear", **kwargs):
         super().__init__(latent_dim=units, return_sequences=True, **kwargs)
-        self.feature_time_att_layer = FeatureTimeAttentionLayer(units=units, activation=activation)
+        self.feat_time_attention_layer = FeatTimeAttention(units=units, activation=activation)
 
-    def call(self, inputs, mask=None, training=True):
-        """Forward pass of layer block."""
+    def call(self, inputs, mask=None, training: bool = True):
+        """
+        Forward pass of layer block.
+
+        Params:
+        - inputs: array-like of shape (bs, T, D_f)
+        - mask: array-like of shape (bs, T) (default = None)
+        - training: bool indicating whether to make computation in training mode or not. (default = True)
+
+        Returns:
+        - z: array-like of shape (bs, units)
+        """
+
+        # Compute LSTM output states
         latent_reps = super().call(inputs, mask=mask, training=training)
-        z = self.feature_time_att_layer.call(inputs=inputs, latent_reps=latent_reps)
+
+        # Compute representation through feature time attention layer
+        attention_inputs = (inputs, latent_reps)
+        z = self.feature_time_att_layer(attention_inputs)
 
         return z
 
-    def compute_attention_map_scores(self, inputs, cluster_reps):
-        """Compute alpha, beta, gamma scores for cluster estimation."""
+    def compute_unnorm_scores(self, inputs, cluster_reps=None):
+        """Compute unnormalised scores alpha, beta, gamma given input data and cluster representation vectors.
+
+        Params:
+        - inputs: array-like of shape (bs, T, D_f)
+        - cluster_reps: array-like of shape (K, units) of cluster representation vectors. (default = None)
+
+        If cluster_reps is None, compute only alpha and beta weights.
+
+        Returns:
+        - Tuple of arrays, containing alpha, beta, gamma unnormalised attention weights.
+        """
         latent_reps = super().call(inputs, training=False)
-        return self.feature_time_att_layer.compute_all_scores(inputs, latent_reps, cluster_reps)
 
-    def estimate_alpha_beta(self, inputs):
-        """Compute alpha, beta as in the forward call of forward attention layer"""
+        return self.feature_time_att_layer.compute_unnorm_scores(inputs, latent_reps, cluster_reps)
 
-        # Compute latent representations and estimate alpha
+    def compute_norm_scores(self, inputs, cluster_reps=None):
+        """Compute normalised scores alpha, beta, gamma given input data and cluster representation vectors.
+
+        Params:
+        - inputs: array-like of shape (bs, T, D_f)
+        - cluster_reps: array-like of shape (K, units) of cluster representation vectors. (default = None)
+
+        If cluster_reps is None, compute only alpha and beta weights.
+
+        Returns:
+        - Tuple of arrays, containing alpha, beta, gamma normalised attention weights.
+        """
         latent_reps = super().call(inputs, training=False)
-        _, alpha_hat = self.feature_time_att_layer.compute_o_hat_and_alpha(inputs, latent_reps)
 
-        # Estimate beta
-        beta_hat = self.feature_time_att_layer.beta_weights
-
-        return alpha_hat, beta_hat
+        return self.feature_time_att_layer.compute_norm_scores(inputs, latent_reps, cluster_reps)
 
     def get_config(self):
         """Update configuration for layer."""
