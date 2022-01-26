@@ -711,6 +711,12 @@ class Model:
         clus_phenotypes = pd.DataFrame(self.model.compute_cluster_phenotypes(), index=cluster_names, columns=outc_dims)
         cluster_rep_set = self.model.get_cluster_reps()
 
+        # Fourth, save model init losses
+        init_loss_1 = self.model._enc_pred_loss_tracker
+        init_loss_2 = self.model._iden_loss_tracker
+        enc_pred_tracker.index.name, iden_tracker.index.name = "epoch", "epoch"
+
+
         # Save data
         y_pred.to_csv(save_fd + "y_pred.csv", index=True, header=True)
         outc_pred.to_csv(save_fd + "outc_pred.csv", index=True, header=True)
@@ -720,15 +726,10 @@ class Model:
         clus_phenotypes.to_csv(save_fd + "clus_phenotypes.csv", index=True, header=True)
         np.save(save_fd + "cluster_representations.npy", cluster_rep_set, allow_pickle=True)
 
+        # save losses and model params
+        init_loss_1.to_csv(track_fd + "enc_pred_init_loss.csv", index=True, header=True)
+        init_loss_2.to_csv(track_fd + "iden_init_loss.csv", index=True, header=True)
 
-        # Save Init Losses
-        enc_pred_tracker = model._enc_pred_loss_tracker
-        iden_tracker = model._iden_loss_tracker
-
-        enc_pred_tracker.index.name, iden_tracker.index.name = "epoch", "epoch"
-
-        enc_pred_tracker.to_csv(track_fd + "enc_pred_init_loss.csv", index=True, header=True)
-        iden_tracker.to_csv(track_fd + "iden_init_loss.csv", index=True, header=True)
 
         # save parasm
         # Save Model Configuration on both results and experiments
