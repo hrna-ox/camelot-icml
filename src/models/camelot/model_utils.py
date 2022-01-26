@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Loss, Metrics and Callback functions to use for model
+Loss, Metrics and Callback functions to use for Camelot model.
 
 @author: henrique.aguiar@ds.ccrg.kadooriecentre.org
 """
@@ -34,12 +34,19 @@ def purity_score(y_true, y_pred):
 
     return np.sum(np.amax(contingency_matrix_, axis=0)) / np.sum(contingency_matrix_)
 
+
 # ------------------------------------------------------------------------------------
 """Loss Functions"""
 
 
-def l_pred(y_true, y_pred, weights=None, name='pred_clus_L'):
-    """ Predictive clustering loss."""
+def l_pred(y_true, y_pred, weights=None, name='pred_clus_loss'):
+    """
+    Predictive clustering loss
+
+    Params:
+    - y_true: tensor of shape (bs, num_outcs)
+    - y_pred: tensor of shape (bs, num_outcs)
+    """
 
     # Check for whether weights are given or not
     if weights is None:
@@ -54,40 +61,57 @@ def l_pred(y_true, y_pred, weights=None, name='pred_clus_L'):
 
 
 def l_clus(clusters, name='emb_sep_L'):
-    """Compute Embedding separation Loss on embedding vectors."""
+    """
+    Cluster representation separation loss.
 
-    embedding_column = tf.expand_dims(clusters, axis=1)
-    embedding_row = tf.expand_dims(clusters, axis=0)
+    Params:
+    - clusters: tensor of shape (K, _ )
+    """
+
+    # Expand dims to take advantage of broadcasting
+    embedding_column = tf.expand_dims(clusters, axis=1)          # shape (K, 1, _)
+    embedding_row = tf.expand_dims(clusters, axis=0)             # shape (1, K, _)
 
     # Compute L1 distance
-    pairwise_loss = tf.reduce_sum((embedding_column - embedding_row) ** 2, axis=-1)  # shape K, K
-    loss = - tf.reduce_sum(pairwise_loss, axis=None, name=name)
+    pairwise_loss = - tf.reduce_sum((embedding_column - embedding_row) ** 2, axis=-1)  # shape K, K
+    loss = tf.reduce_sum(pairwise_loss, axis=None, name=name)
 
     # normalise by K(K-1=/2
-    norm_factor = tf.math.subtract(tf.math.square(clusters.get_shape()[0]), clusters.get_shape()[0])
+    K = clusters.get_shape()[0]
+    norm_factor = K * (K - 1) / 2
     norm_loss = tf.math.divide(loss, tf.cast(norm_factor, dtype="float32"))
 
     return norm_loss
 
 
-def l_dist(y_prob):
-    """Cluster loss to encourage exploration of all available clusters."""
+def l_dist(clus_prob, name = "clus_sel_loss"):
+    """
+    Cluster selection loss.
 
-    # Compute average distribution over each cluster and compute negative entropy of resulting distribution
-    avg_prob_per_clust = tf.reduce_mean(y_prob, axis=-1, name="average")
-    entropy = tf.reduce_sum(multiply(avg_prob_per_clust, log(avg_prob_per_clust + 1E-8)))
+    Params:
+    - clus_prob: tensor of shape (batch_size, num_clusters).
+    """
 
-    return entropy
+    # Compute average distribution over each cluster
+    avg_prob_per_clus = tf.reduce_mean(clus_prob, axis=-1, name=name)
+
+    # Compute negative entropy - minimised for uniform distribution.
+    neg_entropy = tf.reduce_sum(multiply(avg_prob_per_clus, log(avg_prob_per_clus)))
+
+    return neg_entropy
 
 
 # ----------------------------------------------------------------------------------
 "Useful information to print during training."
 
 
-class CESeparation(cbck.Callback):
-    """Compute normalised Cross-Entropy Loss between cluster phenotypes. Smaller the better."""
+class y_clus_cross_entropy(cbck.Callback):
+    """
+    Compute normalised Cross-Entropy Loss between cluster phenotypes.
+    Smaller values represent more separation of y_clusters.
+    """
 
-    def __init__(self, validation_data=(), interval=5):
+    def __init__(self, validation_data: tuple = (), interval: int = 5):
         super().__init__()
         self.interval = interval
         self.X_val, _ = validation_data
@@ -280,7 +304,6 @@ def get_callbacks(track_loss, early_stop=True, lr_scheduler=True, tensorboard=Tr
     assert not os.path.exists(save_fd)
     os.makedirs(save_fd)
     os.makedirs(save_fd + "logs/")
-
 
     # Model Weight saving callback
     checkpoint = cbck.ModelCheckpoint(filepath=save_fd + "models/checkpoints/epoch-{epoch}", save_best_only=True,
