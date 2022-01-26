@@ -11,40 +11,69 @@ from tensorflow.keras.regularizers import l1_l2 as mix_l1_l2_reg
 
 # ------------ Utility Functions --------------
 def _estimate_alpha(feature_reps, targets):
-    """ alpha parameters OLS estimation given projected input features and targets.
-    feature_reps: shape (bs, T, d, units)
-    targets: shape (bs, T, units)
+    """
+    alpha parameters OLS estimation given projected input features and targets.
+
+    Params:
+    - feature_reps: array-like of shape (bs, T, d, units)
+    - targets: array-like of shape (bs, T, units)
+
+    returns:
+    - un-normalised alpha weights: array-like of shape (bs, T, d)
     """
     X_T, X = feature_reps, linalg.matrix_transpose(feature_reps)
 
     # Compute matrix inversion
-    A_inv = linalg.inv(linalg.matmul(X_T, X))
+    X_TX_inv = linalg.inv(linalg.matmul(X_T, X))
     X_Ty = linalg.matmul(X_T, tf.expand_dims(targets, axis=-1))
 
     # Compute likely scores
-    alpha_hat = linalg.matmul(A_inv, X_Ty)
+    alpha_hat = linalg.matmul(X_TX_inv, X_Ty)
 
-    return tf.squeeze(alpha_hat)  # shape (bs, T, d) (NOT normalised)
+    return tf.squeeze(alpha_hat)
 
 
 def _estimate_gamma(o_hat, cluster_targets):
     """
     Estimate gamma parameters through OLS estimation given projected input features and targets.
-    o_hat: shape (bs, T, units)
-    targets: shape (K, units)
+
+    Params:
+    - o_hat: array-like of shape (bs, T, units)
+    - targets: array-like of shape (K, units)
+
+    returns:
+    - gamma_weights: array-like of shape (bs, K, T)
     """
     X_T = tf.expand_dims(o_hat, axis=1)
     X = linalg.matrix_transpose(X_T)
     y = tf.expand_dims(tf.expand_dims(cluster_targets, axis=0), axis=-1)
 
     # Compute inversion
-    A_inv = linalg.inv(linalg.matmul(X_T, X))
+    X_TX_inv = linalg.inv(linalg.matmul(X_T, X))
     X_Ty = linalg.matmul(X_T, y)
 
     # Compute gamma
-    gamma_hat = linalg.matmul(A_inv, X_Ty)
+    gamma_hat = linalg.matmul(X_TX_inv, X_Ty)
 
     return tf.squeeze(gamma_hat)
+
+
+def _norm_abs(array, axis: int = 1):
+    """
+    Compute L1 normalisation of array according to axis.
+
+    Params:
+    - array: array-like object.
+    - axis: integer.
+
+    returns:
+    - normalised array according to axis.
+    """
+    array_abs = tf.math.abs(array)
+
+    output = array_abs / tf.reduce_sum(array_abs, axis=axis, keepdims=True)
+
+    return output
 
 
 # ------------ MLP definition ---------------
@@ -55,23 +84,18 @@ class MLP(Layer):
     Params:
     - output_dim : int, dimensionality of output space for each sub-sequence.
     - hidden_layers : int, Number of "hidden" feedforward layers. (default = 2)
-    - hidden_nodes : int, For "hidden" feedforward layers, the dimensionality 
-                        of the output space. (default = 30)
-    - activation_fn : str/fn, The activation function to use. 
-                        (default = 'sigmoid')
-    - output_fn : str/fn, The activation function on the output of the MLP. 
-                        (default = 'softmax').
+    - hidden_nodes : int, For "hidden" feedforward layers, the dimensionality of the output space. (default = 30)
+    - activation_fn : str/fn, The activation function to use. (default = 'sigmoid')
+    - output_fn : str/fn, The activation function on the output of the MLP. (default = 'softmax').
     - dropout : float, dropout rate (default = 0.6).
     - regulariser_params : tuple of floats for regularization (default = (0.01, 0.01))
     - seed : int, Seed used for random mechanisms (default = 4347)
-    - name : str, name on which to save layer. (defult = 'decoder')
+    - name : str, name on which to save layer. (default = 'MLP')
     """
 
-    def __init__(self, output_dim: int, hidden_layers: int = 2, 
-                 hidden_nodes: int  = 30, activation_fn = 'sigmoid', 
-                 output_fn='softmax', dropout: float = 0.6,
-                 regulariser_params = (0.01, 0.01), seed: int = 4347, 
-                 name: float = 'MLP'):
+    def __init__(self, output_dim: int, hidden_layers: int = 2, hidden_nodes: int = 30, activation_fn='sigmoid',
+                 output_fn='softmax', dropout: float = 0.6, regulariser_params: tuple = (0.01, 0.01), seed: int = 4347,
+                 name: str = 'MLP'):
 
         # Block parameters
         super().__init__(name=name)
@@ -80,33 +104,31 @@ class MLP(Layer):
         self.hidden_nodes = hidden_nodes
         self.activation_fn = activation_fn
         self.output_fn = output_fn
-        
+
         # Regularization params
         self.dropout = dropout
         self.regulariser = mix_l1_l2_reg(regulariser_params)
-        
+
         # Seed
         self.seed = seed
 
-
-
         # Add intermediate layers to the model
         for layer_id_ in range(self.hidden_layers):
-            
             # Add Dense layer to model
-            layer_ = Dense(units=self.hidden_nodes, 
+            layer_ = Dense(units=self.hidden_nodes,
                            activation=self.activation_fn,
                            kernel_regularizer=self.regulariser,
                            activity_regularizer=self.regulariser)
-            
+
             self.__setattr__('layer_' + str(layer_id_), layer_)
+
+            # Add corresponding Dropout Layer
+            dropout_layer = Dropout(rate=self.dropout, seed=self.seed + layer_id_)
+            self.__setattr__('dropout_layer_' + str(layer_id_), dropout_layer)
 
         # Input and Output layers
         self.input_layer = Dense(units=self.hidden_nodes, activation=self.activation_fn)
         self.output_layer = Dense(units=self.output_dim, activation=self.output_fn)
-
-        # Dropout layer
-        self.dropout_layer = Dropout(rate=self.dropout, seed=self.seed)
 
     def call(self, inputs, training=True):
         """Forward pass of layer block."""
@@ -114,24 +136,37 @@ class MLP(Layer):
 
         # Iterate through hidden layer computation
         for layer_id_ in range(self.hidden_layers):
+            # Get layers
             layer_ = self.__getattribute__('layer_' + str(layer_id_))
-            x_inter = layer_(x_inter, training=training)
+            dropout_layer_ = self.__getattribute__('dropout_layer_' + str(layer_id_))
+
+            # Make layer computations
+            x_inter = dropout_layer_(layer_(x_inter, training=training))
 
         return self.output_layer(x_inter, training=training)
 
     def get_config(self):
         """Update configuration for layer."""
+
+        # Load existing configuration
         config = super().get_config().copy()
-        config.update({"output_dim": self.output_dim, "hidden_layers": self.hidden_layers,
-                       "hidden_nodes": self.hidden_nodes, "activation_fn": self.activation_fn,
-                       "output_fn": self.output_fn, "dropout": self.dropout, "seed": self.seed})
+
+        # Update configuration
+        config.update({f"{self.name}-output_dim": self.output_dim,
+                       f"{self.name}-hidden_layers": self.hidden_layers,
+                       f"{self.name}-hidden_nodes": self.hidden_nodes,
+                       f"{self.name}-activation_fn": self.activation_fn,
+                       f"{self.name}-output_fn": self.output_fn,
+                       f"{self.name}-dropout": self.dropout,
+                       f"{self.name}-seed": self.seed})
 
         return config
 
 
-class FeatureTimeAttentionLayer(Layer):
+class FeatTimeAttention(Layer):
     """
-    Custom Feature Attention Layer as proposed in the ICLR submission.
+    Custom Feature Attention Layer. Features are projected to latent dimension and approximate output RNN states.
+    Approximations are sum-weighted to obtain a final representation.
 
     Params:
     units: int, dimensionality of projection/latent space.
@@ -139,11 +174,20 @@ class FeatureTimeAttentionLayer(Layer):
     name: str, the name on which to save the layer. (default = "custom_att_layer")
     """
 
-    def __init__(self, units, activation="linear", name="custom_layer"):
+    def __init__(self, units, activation="linear", name: str = "custom_layer"):
+
+        # Load layer params
         super().__init__(name=name)
+
+        # Initialise key layer attributes
         self.units = units
         self.activation_name = activation
         self.activation = tf.keras.activations.get(activation)  # get activation from  identifier
+
+        # Initialise layer weights to None
+        self.kernel = None
+        self.bias = None
+        self.unnorm_beta_weights = None
 
     def build(self, input_shape=None):
         """Build method for the layer given input shape."""
@@ -155,79 +199,124 @@ class FeatureTimeAttentionLayer(Layer):
         self.bias = self.add_weight("bias", shape=[1, 1, Df, self.units],
                                     initializer='uniform', trainable=True)
 
-        # Time aggreggation learn weights
-        self.beta_weights = self.add_weight(name='time_agg', shape=[1, T, 1],
-                                            initializer="uniform", trainable=True)
+        # Time aggregation learn weights
+        self.unnorm_beta_weights = self.add_weight(name='time_agg', shape=[1, T, 1],
+                                                   initializer="uniform", trainable=True)
 
         super().build(input_shape)
 
-    def call(self, inputs, latent_reps):
+    def call(self, inputs, **kwargs):
         """
         Forward pass of the Custom layer - requires inputs and estimated latent projections.
 
         Params:
-        inputs: Tensor of shape (batch size, T, Df)
-        latent_reps: Tensor of shape (batch_size, T, latent dim)
-        """
-        o_hat, _ = self.compute_o_hat_and_alpha(inputs, latent_reps)
-        z = tf.reduce_sum(tf.math.multiply(o_hat, self.beta_weights), axis=1)
+        - inputs: tuple of two arrays:
+            - input_data: array-like of input data of shape (bs, T, D_f)
+            - latent_reps: array-like of representations of shape (bs, T, units)
 
-        return z  # shape (bs, units)
+        returns:
+        - latent_representation (z): array-like of shape (bs, units)
+        """
+
+        # Unpack input
+        input_data, latent_reps = inputs
+
+        # Compute output state approximations
+        o_hat, _ = self.compute_o_hat_and_alpha(input_data, latent_reps)
+
+        # Normalise temporal weights and sum-weight approximations to obtain representation
+        beta_scores = _norm_abs(self.unnorm_beta_weights)
+        z = tf.reduce_sum(tf.math.multiply(o_hat, beta_scores), axis=1)
+
+        return z
 
     def compute_o_hat_and_alpha(self, inputs, latent_reps):
-        """Given input and targets (latent_reps), compute OLS approximation to targets and weights."""
-        # Compute features and estimated OLS alpha weights
-        feature_projections = self._compute_feature_projections(inputs)
+        """
+        Compute approximation to latent representations, given input feature data.
+
+        Params:
+        - inputs: array-like of shape (bs, T, D_f)
+        - latent_reps: array-like of shape (bs, T, units)
+
+        returns:
+        - output: tuple of arrays:
+           - array-like of shape (bs, T, units) of representation approximations
+           - array-like of shape (bs, T, D_f) of alpha_weights
+        """
+
+        # Compute feature projections
+        feature_projections = self.activation(
+            tf.math.multiply(tf.expand_dims(inputs, axis=-1), self.kernel) + self.bias)
+
+        # estimate alpha coefficients through OLS
         alpha_t = _estimate_alpha(feature_projections, targets=latent_reps)
 
-        # aggreggate over Df, to compute ohat
+        # sum-weight feature projections according to alpha_t to compute latent approximations
         o_hat = tf.reduce_sum(tf.math.multiply(tf.expand_dims(alpha_t, axis=-1), feature_projections), axis=2)
 
         return o_hat, alpha_t
 
-    def compute_all_scores(self, inputs, latent_reps, cluster_reps):
-        """Return alpha, beta, gamma weights for attention map computation. """
-        alpha = self._alpha_scores(inputs, latent_reps)
-        beta = self._beta_scores()
-        gamma = self._gamma_scores(inputs, latent_reps, cluster_reps)
+    def compute_unnorm_scores(self, inputs, latent_reps, cluster_reps=None):
+        """
+        Compute unnorm_weights for attention values.
 
-        return alpha, beta, gamma  # shape (bs, T, D), (1, T, 1), (bs, K, T)
+        Params: - inputs: array-like of shape (bs, T, D_f) of input data - latent_reps: array-like of shape (bs, T,
+        units) of RNN cell output states. - cluster_reps: array-like of shape (K, units) of cluster representation
+        vectors (default = None). If None, gamma computation is skipped.
 
-    def estimate_gamma(self, inputs, latent_targets, cluster_reps):
-        """Estimate gamma_n,t^{k} parameter to approximate cluster_reps"""
-        o_hat, _ = self.compute_o_hat_and_alpha(inputs, latent_targets)
-        gamma_t_k = _estimate_gamma(o_hat, cluster_reps)
+        Returns: - output: tuple of arrays (alpha, beta, gamma) with corresponding values. If cluster_reps is None,
+        gamma computation is skipped.
+        """
 
-        return gamma_t_k
+        # Compute alpha weights
+        o_hat, alpha_t = self.compute_o_hat_and_alpha(inputs, latent_reps)
 
-    def _compute_feature_projections(self, inputs):
-        """Feature-Time projection to latent space"""
+        # Load beta weights
+        beta = self.unnorm_beta_weights
 
-        linear_map = tf.math.multiply(tf.expand_dims(inputs, axis=-1), self.kernel) + self.bias
+        # If cluster_reps not None, compute gamma
+        if cluster_reps is None:
+            gamma_t_k = None
+        else:
+            gamma_t_k = _estimate_gamma(o_hat, cluster_reps)
 
-        return self.activation(linear_map)
+        return alpha_t, beta, gamma_t_k
 
-    def _alpha_scores(self, inputs, targets):
-        """Compute normalised alpha param estimations."""
-        _, alpha_t = self.compute_o_hat_and_alpha(inputs, targets)
+    def compute_norm_scores(self, inputs, latent_reps, cluster_reps=None):
+        """
+        Compute normalised attention scores alpha, beta, gamma.
 
-        return tf.math.abs(alpha_t) / tf.reduce_sum(tf.math.abs(alpha_t), 
-                                                    axis = -1, keepdims = True)
+        Params: - inputs: array-like of shape (bs, T, D_f) of input data - latent_reps: array-like of shape (bs, T,
+        units) of RNN cell output states. - cluster_reps: array-like of shape (K, units) of cluster representation
+        vectors (default = None). If None, gamma computation is skipped.
 
-    def _beta_scores(self):
-        return tf.math.abs(self.beta_weights) / tf.reduce_sum(tf.math.abs(self.beta_weights), 
-                                                    axis = -1, keepdims = True)
+        Returns: - output: tuple of arrays (alpha, beta, gamma) with corresponding normalised scores. If cluster_reps
+        is None, gamma computation is skipped.
+        """
 
-    def _gamma_scores(self, inputs, targets, cluster_reps):
-        gamma_t_k = self.estimate_gamma(inputs, targets, cluster_reps)
+        # Load unnormalised scores
+        alpha, beta, gamma = self.compute_unnorm_scores(inputs, latent_reps, cluster_reps)
 
-        return tf.math.abs(gamma_t_k) / tf.reduce_sum(tf.math.abs(gamma_t_k), 
-                                                    axis = -1, keepdims = True)
+        # Normalise
+        alpha_norm = _norm_abs(alpha, axis=1)
+        beta_norm = _norm_abs(beta, axis=1)
+
+        if gamma is None:
+            gamma_norm = None
+        else:
+            gamma_norm = _norm_abs(gamma, axis=1)
+
+        return alpha_norm, beta_norm, gamma_norm
 
     def get_config(self):
         """Update configuration for layer."""
+
+        # Load existing configuration
         config = super().get_config().copy()
-        config.update({"units": self.units, "activation": self.activation_name})
+
+        # Update configuration
+        config.update({f"{self.name}-units": self.units,
+                       f"{self.name}-activation": self.activation)
 
         return config
 
