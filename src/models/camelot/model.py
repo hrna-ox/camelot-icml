@@ -12,6 +12,8 @@ import pandas as pd
 import tensorflow as tf
 from sklearn.cluster import KMeans
 from tensorflow.keras import optimizers
+from sklearn.metrics import adjusted_rand_score, davies_bouldin_score, calinski_harabasz_score
+from sklearn.metrics import normalized_mutual_info_score, silhouette_score, roc_auc_score
 
 # Auxiliary
 import src.models.camelot.model_utils as model_utils
@@ -97,7 +99,7 @@ class CAMELOT(tf.keras.Model):
     def __init__(self, num_clusters=10, latent_dim=32, seed=4347, output_dim=4, name="Camelot",
                  alpha=0.01, beta=0.01, regulariser_params=(0.01, 0.01), dropout=0.6,
                  encoder_params=None, identifier_params=None, predictor_params=None, cluster_rep_lr=0.001,
-                 optimizer_init="adam", weighted_loss=True, **kwargs):
+                 optimizer_init="adam", weighted_loss=True):
 
         super().__init__(name=name)
 
@@ -137,8 +139,8 @@ class CAMELOT(tf.keras.Model):
         self.cluster_opt = optimizers.Adam(learning_rate=self.cluster_rep_lr)
 
         # Initialisation loss trackers
-        self._enc_pred_loss_tracker = None
-        self._iden_loss_tracker = None
+        self.enc_pred_loss_tracker = None
+        self.iden_loss_tracker = None
 
         # Others
         self._optimizer_init = tf.keras.optimizers.get(optimizer_init)
@@ -153,7 +155,7 @@ class CAMELOT(tf.keras.Model):
 
         super().build(input_shape)
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs):
         """
         Call method for model.
 
@@ -171,7 +173,8 @@ class CAMELOT(tf.keras.Model):
     # TRAINING RELATED METHODS
     def forward_pass(self, inputs):
         """
-        Single forward pass given input data. Inputs are encoded. Encoded vectors pass through Identifier and assigned to clusters. Cluster representations are used to predict outcome.
+        Single forward pass given input data. Inputs are encoded. Encoded vectors pass through Identifier and
+        assigned to clusters. Cluster representations are used to predict outcome.
 
         Params:
         - inputs: array-like of shape (bs, T, D_f) of input data.https://en.wikipedia.org/wiki/Schauder_basis
@@ -359,7 +362,8 @@ class CAMELOT(tf.keras.Model):
               - epochs: int, number of epochs for training. (default = 100)
               - batch_size: int, size of individual batches.
 
-        Input data passes through Encoder network to obtain data representations. Predictor then outputs a predicted class. This is matched against the true class.
+        Input data passes through Encoder network to obtain data representations. Predictor then outputs a predicted
+        class. This is matched against the true class.
         """
 
         # Unpack inputs
@@ -370,7 +374,7 @@ class CAMELOT(tf.keras.Model):
         inputs = tf.data.Dataset.from_tensor_slices((x, y)).shuffle(buffer_size=5000).batch(batch_size)
 
         # Initialise loss tracker
-        self._enc_pred_loss_tracker = pd.DataFrame(data=np.nan, index=range(epochs), columns=["train_loss", "val_loss"])
+        self.enc_pred_loss_tracker = pd.DataFrame(data=np.nan, index=range(epochs), columns=["train_loss", "val_loss"])
         enc_pred_vars = [var for var in self.trainable_variables if "Encoder" in var.name or "Predictor" in var.name]
 
         # Iterate through epochs and batches
@@ -403,11 +407,11 @@ class CAMELOT(tf.keras.Model):
 
             # Print result and update tracker
             print("End of epoch %d - \n Training loss: %.4f  Validation loss %.4f" % (
-            epoch, epoch_loss / step_, loss_val))
-            self._enc_pred_loss_tracker.loc[epoch, :] = [epoch_loss / step_, loss_val]
+                epoch, epoch_loss / step_, loss_val))
+            self.enc_pred_loss_tracker.loc[epoch, :] = [epoch_loss / step_, loss_val]
 
             # Check if has improved or not
-            if self._enc_pred_loss_tracker.iloc[-50:, -1].le(loss_val + 0.001).any():
+            if self.enc_pred_loss_tracker.iloc[-50:, -1].le(loss_val + 0.001).any():
                 break
 
     def _initialise_clus(self, x, val_x, **kwargs):
@@ -468,7 +472,8 @@ class CAMELOT(tf.keras.Model):
               - epochs: int, number of epochs for training. (default = 100)
               - batch_size: int, size of individual batches.
 
-        Input data passes through Encoder network to obtain data representations. Predictor then outputs a predicted class. This is matched against the true class.
+        Input data passes through Encoder network to obtain data representations. Predictor then outputs a predicted
+        class. This is matched against the true class.
         """
         # Input in the right format
         X_train, clus_train_y = data
@@ -478,7 +483,7 @@ class CAMELOT(tf.keras.Model):
         inputs = tf.data.Dataset.from_tensor_slices((X_train, clus_train_y)).shuffle(buffer_size=5000).batch(batch_size)
 
         # Initialise loss tracker
-        self._iden_loss_tracker = pd.DataFrame(data=np.nan, index=range(epochs), columns=["train_loss", "val_loss"])
+        self.iden_loss_tracker = pd.DataFrame(data=np.nan, index=range(epochs), columns=["train_loss", "val_loss"])
         iden_vars = [var for var in self.trainable_variables if "Identifier" in var.name]
 
         # Forward Identifier pass and train
@@ -512,11 +517,11 @@ class CAMELOT(tf.keras.Model):
 
             # Print result and update tracker
             print("End of epoch %d - \n Training loss: %.4f  Validation loss %.4f" % (
-            epoch, epoch_loss / step_, loss_val))
-            self._iden_loss_tracker.loc[epoch, :] = [epoch_loss / step_, loss_val]
+                epoch, epoch_loss / step_, loss_val))
+            self.iden_loss_tracker.loc[epoch, :] = [epoch_loss / step_, loss_val]
 
             # Check if has improved or not - look at last 50 epoch validation loss and check if 
-            if self._iden_loss_tracker.iloc[-50:, -1].le(loss_val + 0.001).any():
+            if self.iden_loss_tracker.iloc[-50:, -1].le(loss_val + 0.001).any():
                 break
 
     # USEFUL METHODS
@@ -561,7 +566,7 @@ class CAMELOT(tf.keras.Model):
 
         return phens
 
-    def clus_assign(self, X):
+    def clus_assign(self, x):
         """
         Compute cluster assignments given input data X.
 
@@ -571,7 +576,7 @@ class CAMELOT(tf.keras.Model):
         Returns:
         - clus_pred: array-like of shape (bs, ) with corresponding cluster assignment.
             """
-        pi = self.Identifier(self.Encoder(X)).numpy()
+        pi = self.Identifier(self.Encoder(x)).numpy()
         clus_pred = np.argmax(pi, axis=1)
 
         return clus_pred
@@ -579,9 +584,9 @@ class CAMELOT(tf.keras.Model):
     def get_cluster_reps(self):
         return self.cluster_rep_set.numpy()
 
-    def compute_pis(self, X):
+    def compute_pis(self, x):
         """Obtain cluster assignment probabilities."""
-        pis = self.Identifier(self.Encoder(X))
+        pis = self.Identifier(self.Encoder(x))
 
         return pis.numpy()
 
@@ -589,7 +594,7 @@ class CAMELOT(tf.keras.Model):
         """Update configuration for layer."""
         config = super().get_config().copy()
         config.update({"latent_dim": self.latent_dim, "hidden_layers": self.hidden_layers,
-                       "hidde_nodes": self.hidden_nodes, "state_fn": self.state_fn,
+                       "hidden_nodes": self.hidden_nodes, "state_fn": self.state_fn,
                        "recurrent_fn": self.recurrent_fn, "return_sequences": self.return_sequences,
                        "dropout": self.dropout, "recurrent_dropout": self.recurrent_dropout,
                        "regulariser_params": self.regulariser_params})
@@ -618,23 +623,27 @@ class Model:
     """
 
     def __init__(self, data_info, model_config):
-        "Initialise model configuration parameters."
+        """Initialise model configuration parameters."""
         self.data_info = data_info
         self.model_config = model_config
+        self.model_name = "camelot"
+        self.train_params = None
         self.model = None
+        self.run_num = 1
 
     def fit(self, train_params):
         """
         Fit method for training CAMELOT model.
 
         Params:
-        - train_params: dictionary containing trianing parameter information:
+        - train_params: dictionary containing training parameter information:
             - "lr": learning rate for training
             - "epochs_init": number of epochs to train initialisation
             - "epochs": number of epochs for main training
             - "bs": batch size
             - "cbck_str": callback_string indicating which callbacks to print during training
         """
+        self.train_params = train_params
 
         # Unpack relevant data information
         X_train, X_val, X_test = self.data_info["X"]
@@ -658,16 +667,17 @@ class Model:
         self.model.compile(optimizer=optimizer, run_eagerly=True)
 
         # Train model on initialisation procedure
-        epochs_init = 100
+        epochs_init = train_params["epochs_init"]
         print("-" * 20, "\n", "Initialising Model", sep="\n")
-        self.model.initialise_model(data=(X_train, y_train), val_data=(X_val, y_val), epochs=epochs, learning_rate=lr,
-                                    batch_size=bs)
+        self.model.initialise_model(data=(X_train, y_train), val_data=(X_val, y_val), epochs=epochs_init,
+                                    learning_rate=lr, batch_size=bs)
 
         # Main Training phase
         print("-" * 20, "\n", "STARTING MAIN TRAINING PHASE")
         callbacks, run_num = model_utils.get_callbacks(track_loss="L1", other_cbcks=callback_str, early_stop=True,
                                                        lr_scheduler=True,
                                                        tensorboard=True)
+        self.run_num = run_num
 
         self.model.fit(X_train, y_train, validation_data=(X_val, y_val), batch_size=bs, epochs=epochs, verbose=1,
                        callbacks=callbacks)
@@ -692,6 +702,8 @@ class Model:
         id_info = self.data_info["ids"][-1]
         pat_ids = id_info[:, 0, 0]
         outc_dims = self.data_info["outc_dims"]
+        save_fd = f"results/{self.model_name}/{self.run_num}/"
+        track_fd = f"experiments/{self.model_name}/{self.run_num}/"
 
         # Other useful defs
         K = self.model.K
@@ -700,8 +712,7 @@ class Model:
         # Firstly, compute predicted y estimates
         y_pred = pd.DataFrame(self.model.predict(X_test).numpy(), index=pat_ids, columns=outc_dims)
         outc_pred = pd.Series(np.argmax(y_pred, axis=-1), index=pat_ids)
-        y_true = pd.Series(y_test, index=pat_ids)
-
+        y_true = pd.DataFrame(y_test, index=pat_ids, columns=outc_dims)
 
         # Secondly, compute predicted cluster assignments
         pis_pred = pd.DataFrame(self.model.compute_pis(X_test).numpy(), index=pat_ids, columns=cluster_names)
@@ -712,12 +723,28 @@ class Model:
         cluster_rep_set = self.model.get_cluster_reps()
 
         # Fourth, save model init losses
-        init_loss_1 = self.model._enc_pred_loss_tracker
-        init_loss_2 = self.model._iden_loss_tracker
+        init_loss_1 = self.model.enc_pred_loss_tracker
+        init_loss_2 = self.model.iden_loss_tracker
         enc_pred_tracker.index.name, iden_tracker.index.name = "epoch", "epoch"
 
+        # Fifth, compute attention scores
+        alpha, beta, gamma = self.model.compute_unnorm_attention_weights(X_test)
+        alpha_norm, beta_norm, gamma_norm = self.model.compute_norm_attention_weights(X_test)
 
-        # Save data
+        # Finally, compute scores
+        auc, nmi, ars, purity = model_utils.supervised_scores(y_true, y_pred)
+        dbs, chs, sil = model_utils.unsupervised_scores(X_test.reshape(X_test.shape[0], -1), y_pred, self.model.seed)
+
+        # Compute unsupervised metrics on latent
+        projs = self.model.Encoder(X_test).numpy()
+        dbs_lat, chs_lat, sil_lat = model_utils.unsupervised_scores(projs, y_pred, self.model.seed)
+
+        # Combine into a single pandas Series
+        output_scores = pd.Series([auc, nmi, ars, purity, dbs, dbs_lat, chs, chs_lat, sil, sil_lat],
+                                  index=["AUC", "NMI", "ARS", "Purity", "DBS", "DBS_lat", "CHS", "CHS_lat", "SIL",
+                                         "SIL_lat"])
+
+        # Save output data
         y_pred.to_csv(save_fd + "y_pred.csv", index=True, header=True)
         outc_pred.to_csv(save_fd + "outc_pred.csv", index=True, header=True)
         y_true.to_csv(save_fd + "y_true.csv", index=True, header=True)
@@ -726,79 +753,26 @@ class Model:
         clus_phenotypes.to_csv(save_fd + "clus_phenotypes.csv", index=True, header=True)
         np.save(save_fd + "cluster_representations.npy", cluster_rep_set, allow_pickle=True)
 
-        # save losses and model params
+        # Save metric results
+        output_scores.to_csv(save_fd + "scores.csv", index=True, header=True)
+        print("\nSupervised Scores\n", f"AUC {auc:.2f} | NMI {nmi:.2f} | ARS {ars:.2f} | Purity {purity:.2f}")
+        print("\nUnsupervised Scores\n",
+              f"DBS {dbs:.2f}, {dbs_lat:.2f} | CHS {chs:.2f}, {chs_lat:.2f} | SIL {sil:.2f}, {sil_lat:.2f}")
+
+        # save init losses
         init_loss_1.to_csv(track_fd + "enc_pred_init_loss.csv", index=True, header=True)
         init_loss_2.to_csv(track_fd + "iden_init_loss.csv", index=True, header=True)
 
+        # Save attention weights
+        np.savez(save_fd + "unnorm_weights.npy", alpha=alpha, beta=beta, gamma=gamma)
+        np.savez(save_fd + "norm_weights.npy", alpha=alpha_norm, beta=beta_norm, gamma=gamma_norm)
 
-        # save parasm
-        # Save Model Configuration on both results and experiments
-        # with open(save_fd + "config", "w+") as f:
-        #     json.dump(vars(params), f)
-        #     f.close()
+        # save model parameters
+        params = {**self.data_info, **self.model_config, **self.train_params}
+        with open(save_fd + "config", "w+") as f:
+            json.dump(vars(params), f)
+            f.close()
 
-        # with open(track_fd + "config", "w+") as f:
-        #     json.dump(vars(params), f)
-        #     f.close()
-
-        # Evaluate results
-        # auc, f1, rec = os.system("""python run_model.py --K {} --latent_dim {} --seed {}""".format(
-        #     K, latent_dim, seed))
-
-        # ------------------------------------------------------------------------------
-        """Finally, print some basic statistics for analysing this run"""
-        y_true = y_test
-        y_pred = y_pred.values
-        # auc, f1, rec, pur = utils.super_scores(y_true, y_pred)
-        # sil, sil_avg, dbi, dbi_avg, vri, vri_avg = utils.unsuper_scores(X_test, clusters_pred)
-
-        # print("Supervised Performance:", f"AUC: {auc:.2f}", f"f1: {f1:.2f}", f"rec: {rec:.2f}", f"pur: {pur:.2f}", sep = "\n")
-        # print("Unsupervised Scores:", f"SIL: {sil:.2f}, {sil_avg:.2f}", f"DBI: {dbi:.2f}, {dbi_avg:.2f}",
-        #       f"vri: {vri:.2f} {vri_avg:.2f}", sep = "\n")
-
-        cluster_dist = pd.Series(data=0, index=cluster_names)
-        for clus in cluster_names:
-            cluster_dist.loc[clus] = np.sum(clusters_pred == clus)
-
-        print("Cluster Assignment distribution: ", cluster_dist, sep="\n")
-        print("Num Clusters with patients: {}".format(np.sum(cluster_dist != 0)))
-
-        outcome_df = pd.read_csv("data/HAVEN/processed/copd_outcomes.csv", index_col=0)
-        outcomes = outcome_df.loc[clusters_pred.index, :]
-
-        for clus in cluster_names:
-            print("Outcome distribution in Cluster {}".format(clus))
-
-            outcome_distribution = outcomes[clusters_pred == clus].sum(axis=0)
-
-            print(outcome_distribution)
-
-        alpha_sc, beta_sc, gamma_sc = model.compute_attention_rnn_encoder_scores(X_test)
-        np.savez(save_fd + "attention-all.npz", alpha=alpha_sc, beta=beta_sc, gamma=gamma_sc)
-
-        # ------------------------------------------------------------------------------
-        # """Add configuration information and scores to a master excel file."""
-        # run_ids = [time.time(), run_num]
-        # results = [auc, f1, rec, pur, sil, sil_avg, dbi, dbi_avg, vri, vri_avg]
-        # param_names, param_values = vars(params).keys(), vars(params).values()
-
-        # if not os.path.exists(TRACK_FD + "summary.csv"):
-        #     with open(TRACK_FD + "summary.csv", "w+", newline = "") as f:
-        #         writer = csv.writer(f)
-        #         writer.writerow(["time (unix)", "run"] + list(param_names) + ["auc", "f1", "recall", "purity",
-        #                          "sil", "sil_avg", "dbi", "dbi_avg", "vri", "vri_avg"])
-
-        #     f.close()
-
-        # with open(TRACK_FD + "summary.csv", "a", newline = "") as f:
-        #     writer = csv.writer(f)
-
-        #     new_row = [time.time(), run_num] + list(param_values) + [auc, f1, rec, pur, sil, sil_avg, dbi, dbi_avg, vri, vri_avg]
-        #     writer.writerow(new_row)
-
-        #     f.close()
-
-        # np.savez("data/ICLR-submitted/test_data.npz",
-        #          X_test=X_test, y_test=y_test, id_test=id_test,
-        #          mask_test=mask_test, feats=data_info["feats"])
-
+        with open(track_fd + "config", "w+") as f:
+            json.dump(vars(params), f)
+            f.close()

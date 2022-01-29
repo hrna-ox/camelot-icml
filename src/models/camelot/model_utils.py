@@ -38,6 +38,62 @@ def purity_score(y_true, y_pred):
     return np.sum(np.amax(contingency_matrix_, axis=0)) / np.sum(contingency_matrix_)
 
 
+def supervised_scores(y_true, y_pred):
+    """
+    Print Supervised Metric scores given set of true outcomes and predicted class.
+
+    Params:
+    - y_true: array-like of shape (N, num_outcs) with one-hot encoded true classes.
+    - y_pred: array-like of shape (N, num_outcs) with predicted outcome distribution.
+
+    Returns:
+        Tuple of scores:
+        - ROC AUC SCORE (One vs Rest)
+        - Normalised Mutual Information
+        - Adjusted Rand Score
+        - Purity
+    """
+
+    # Convert to categorical
+    class_true = np.argmax(y_true, axis=-1)
+    class_pred = np.argmax(y_pred, axis=-1)
+
+    # Compute scores
+    auc = roc_auc_score(y_true, y_pred, multi_class="ovr")
+    nmi = normalized_mutual_info_score(labels_true=class_true, labels_pred=class_pred)
+    ars = adjusted_rand_score(labels_true=class_true, labels_pred=class_pred)
+    purity = purity_score(y_true=class_true, y_pred=class_pred)
+
+    return auc, nmi, ars, purity
+
+
+def unsupervised_scores(x, y_pred=None, seed: int = 4347):
+    """
+    Print Supervised Metric scores given set of true outcomes and predicted class.
+
+    Params:
+    - X: array-like input data in two dimensions.
+    - y_pred: array-like of shape (N, num_outcs) with predicted outcome distribution.
+    - seed: int, seed to use for computing silhouette score. (default=4347)
+
+    Returns:
+        Tuple of scores:
+        - Davies Bouldin Scores
+        - Calinski Harabasz
+        - Silhouette Score
+    """
+
+    # Compute predicted class
+    clus_pred = np.argmax(y_pred, axis=-1)
+
+    # Compute metrics
+    dbs = davies_bouldin_score(x, labels=clus_pred)
+    chs = calinski_harabasz_score(x, labels=clus_pred)
+    sil = silhouette_score(X=x, labels=clus_pred, random_state=seed)
+
+    return dbs, chs, sil
+
+
 # ------------------------------------------------------------------------------------
 """Loss Functions"""
 
@@ -150,7 +206,7 @@ class CEClusSeparation(cbck.Callback):
         else:
             self.weights = np.ones(shape=(self.y_val.get_shape()[0]))
 
-    def on_epoch_end(self, epoch, logs=None, **kwargs):
+    def on_epoch_end(self, epoch):
 
         # Print information if matches interval epoch length
         if epoch % self.interval == 0:
@@ -190,7 +246,7 @@ class ConfusionMatrix(cbck.Callback):
         # Compute number of outcomes
         self.num_outcs = self.y_val.shape[-1]
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch):
 
         # Print information if matches interval epoch length
         if epoch % self.interval == 0:
@@ -232,7 +288,7 @@ class AUROC(cbck.Callback):
         self.interval = interval
         self.X_val, self.y_val = validation_data
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch):
         if epoch % self.interval == 0:
             # Compute predictions
             y_pred = self.model(self.X_val).numpy()
@@ -258,7 +314,7 @@ class PrintClusterInfo(cbck.Callback):
         self.interval = interval
         self.X_val, self.y_val = validation_data
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch):
         if epoch % self.interval == 0:
 
             # Compute cluster_predictions
@@ -295,7 +351,7 @@ class SupervisedTargetMetrics(cbck.Callback):
         self.interval = interval
         self.X_val, self.y_val = validation_data
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch):
         if epoch % self.interval == 0:
             # Compute y_pred, y_true in categorical format.
             model_output = (self.model(self.X_val)).numpy()
@@ -325,7 +381,7 @@ class UnsupervisedTargetMetrics(cbck.Callback):
         self.interval = interval
         self.X_val, self.y_val = validation_data
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch):
         if epoch % self.interval == 0:
             # Compute predictions and latent representations
             latent_reps = self.model.Encoder(self.X_val)
