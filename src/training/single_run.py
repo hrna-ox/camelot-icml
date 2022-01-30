@@ -14,24 +14,26 @@ from src.training.data_loader import data_loader
 parser = argparse.ArgumentParser()
 
 # Data Loading Parameters
-default_data_config = {}
-parser.add_argument('--data_config', default={}, type=dict, help="data configuration dictionary.")
+default_data_config = {
+    "data_name": "HAVEN",
+    "id_col": "subject_id",
+    "time_col": "feat_set",
+    "feat-set": "vit-lab",
+    "time_range": (24, 72),
+    "include_time": False,
+    "train_test_ratio": 0.4,
+    "train_val_ratio": 0.6,
+    "seed": 2323
+}
+
+parser.add_argument('--data_config', default=default_data_config, type=dict, help="data configuration dictionary.")
 parser.add_argument('--model_config', default={}, type=dict, help="model configuration.")
 parser.add_argument('--train_params', default={}, type=dict, help="useful training parameters.")
-parser.add_argument('--data_name', default="HAVEN", type=str, help="which dataset to load for.")
-parser.add_argument('--id_col', default="subject_id", type=str, help="identifier column for patient information.")
-parser.add_argument('--time_col', default="charttime", type=str, help="identifier for temporal column.")
-parser.add_argument('--feat_set', default="vit-lab", type=str, help="feature set to consider for analysis.")
-parser.add_argument('--time_range', default=(24, 72) , type=tuple, help="Min-Max values to subset for input.")
-parser.add_argument('--include_time', default=False, type=bool, help="Whether to include time difference between observations as another feature.")
-parser.add_argument('--train_test_ratio', default=0.4, type=float, help="ratio between train+val sets and all data.")
-parser.add_argument('--train_val_ratio', default=0.6, type=float, help="ratio between train set and train + val.")
-parser.add_argument('--seed', default=2323, type=int)
 
-
+# Load data
 data_info = data_loader(data_config)
 
-
+# Load model and fit
 model = Model(data_info, model_config)
 model.fit(train_params)
 
