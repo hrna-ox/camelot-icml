@@ -4,10 +4,10 @@ import os
 
 import pandas as pd
 
-import src as utils
-import src as test
+import src.data_processing.MIMIC.data_utils as utils
+import src.data_processing.MIMIC.test as test
 
-from src import SAVE_FD, DATA_FD
+from src.data_processing.MIMIC.admissions_processing import SAVE_FD, DATA_FD
 
 ####################################################
 "MISSING TEST FUNCTIONS FOR ADMISSIONS AND VITALS"
@@ -29,18 +29,6 @@ ID_COLUMNS = ["subject_id", "hadm_id", "stay_id"]
 VITALS_NAMING_DIC = {"temperature": "TEMP", "heartrate": "HR", "resprate": "RR",
                      "o2sat": "SPO2", "sbp": "SBP", "dbp": "DBP"}
 
-# parser = argparse.ArgumentParser()
-# parser.add_argument("--min_obvs_count", type=int, default=3, help="Minimum number of observations p/ admission.")
-# parser.add_argument("--max_na_frac", type=float, default=0.5, help="Maximum allowed fraction of NA p/ admission.")
-# parser.add_argument("--rule", type=str, default="1H", help="re-sampling rule for vital sign conversion.")
-# parser.add_argument("--min_time_to_exit", type=str, default=2, help="""minimum number of hours from last observed
-# value to the admission exit time.""")
-# args = parser.parse_args()
-#
-# admission_min_count = args.min_obvs_count
-# vitals_na_threshold = args.max_na_frac
-# resampling_rule = args.rule
-# admission_min_time_to_outtime = args.min_time_to_exit
 
 admission_min_count = 3
 vitals_na_threshold = 0.5
