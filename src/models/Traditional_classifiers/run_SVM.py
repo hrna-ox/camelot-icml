@@ -118,7 +118,7 @@ possible_clusters = range(2, 50)
 if __name__ == "__main__":
     
     # Load data
-    data_processor = utils.data_processor(**load_init_config)
+    data_processor = utils.DataProcessor(**load_init_config)
     X, y, mask, ids, feats = data_processor.load_transform(**load_config)
     
 

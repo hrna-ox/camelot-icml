@@ -59,7 +59,7 @@ def supervised_scores(y_true, y_pred):
     class_pred = np.argmax(y_pred, axis=-1)
 
     # Compute scores
-    auc = roc_auc_score(y_true, y_pred, multi_class="ovr")
+    auc = roc(y_true, y_pred, multi_class="ovr")
     nmi = normalized_mutual_info_score(labels_true=class_true, labels_pred=class_pred)
     ars = adjusted_rand_score(labels_true=class_true, labels_pred=class_pred)
     purity = purity_score(y_true=class_true, y_pred=class_pred)
@@ -206,7 +206,7 @@ class CEClusSeparation(cbck.Callback):
         else:
             self.weights = np.ones(shape=(self.y_val.get_shape()[0]))
 
-    def on_epoch_end(self, epoch):
+    def on_epoch_end(self, epoch, **kwargs):
 
         # Print information if matches interval epoch length
         if epoch % self.interval == 0:
@@ -246,7 +246,7 @@ class ConfusionMatrix(cbck.Callback):
         # Compute number of outcomes
         self.num_outcs = self.y_val.shape[-1]
 
-    def on_epoch_end(self, epoch):
+    def on_epoch_end(self, epoch, **kwargs):
 
         # Print information if matches interval epoch length
         if epoch % self.interval == 0:
@@ -288,7 +288,7 @@ class AUROC(cbck.Callback):
         self.interval = interval
         self.X_val, self.y_val = validation_data
 
-    def on_epoch_end(self, epoch):
+    def on_epoch_end(self, epoch, **kwargs):
         if epoch % self.interval == 0:
             # Compute predictions
             y_pred = self.model(self.X_val).numpy()
@@ -314,7 +314,7 @@ class PrintClusterInfo(cbck.Callback):
         self.interval = interval
         self.X_val, self.y_val = validation_data
 
-    def on_epoch_end(self, epoch):
+    def on_epoch_end(self, epoch, **kwargs):
         if epoch % self.interval == 0:
 
             # Compute cluster_predictions
@@ -351,7 +351,7 @@ class SupervisedTargetMetrics(cbck.Callback):
         self.interval = interval
         self.X_val, self.y_val = validation_data
 
-    def on_epoch_end(self, epoch):
+    def on_epoch_end(self, epoch, **kwargs):
         if epoch % self.interval == 0:
             # Compute y_pred, y_true in categorical format.
             model_output = (self.model(self.X_val)).numpy()
@@ -381,7 +381,7 @@ class UnsupervisedTargetMetrics(cbck.Callback):
         self.interval = interval
         self.X_val, self.y_val = validation_data
 
-    def on_epoch_end(self, epoch):
+    def on_epoch_end(self, epoch, **kwargs):
         if epoch % self.interval == 0:
             # Compute predictions and latent representations
             latent_reps = self.model.Encoder(self.X_val)

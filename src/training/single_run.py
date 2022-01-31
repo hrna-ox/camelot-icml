@@ -9,33 +9,19 @@ import argparse
 
 from src.models.camelot.model import Model
 from src.training.data_loader import data_loader
-
-# Load arguments
-parser = argparse.ArgumentParser()
+from src.training.data_loader import MIMIC_DEFAULT_LOAD_CONFIG, HAVEN_DEFAULT_LOAD_CONFIG
 
 # Data Loading Parameters
-default_data_config = {
-    "data_name": "HAVEN",
-    "id_col": "subject_id",
-    "time_col": "feat_set",
-    "feat-set": "vit-lab",
-    "time_range": (24, 72),
-    "include_time": False,
-    "train_test_ratio": 0.4,
-    "train_val_ratio": 0.6,
-    "seed": 2323
-}
-
-parser.add_argument('--data_config', default=default_data_config, type=dict, help="data configuration dictionary.")
-parser.add_argument('--model_config', default={}, type=dict, help="model configuration.")
-parser.add_argument('--train_params', default={}, type=dict, help="useful training parameters.")
+data_config = MIMIC_DEFAULT_LOAD_CONFIG
+model_config = {"num_clusters": 12}
+train_params = {""}
 
 # Load data
 data_info = data_loader(data_config)
 
 # Load model and fit
 model = Model(data_info, model_config)
-model.fit(train_params)
+model.fit()
 
 # Compute data test
 data_test = data_info["X"][-1], data_info["y"][-1]

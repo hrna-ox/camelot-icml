@@ -7,13 +7,13 @@ Date Last updated: 24 Jan 2022
 Author: Henrique Aguiar
 Please contact via henrique.aguiar@eng.ox.ac.uk
 """
+import json
+
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from sklearn.cluster import KMeans
 from tensorflow.keras import optimizers
-from sklearn.metrics import adjusted_rand_score, davies_bouldin_score, calinski_harabasz_score
-from sklearn.metrics import normalized_mutual_info_score, silhouette_score, roc_auc_score
 
 # Auxiliary
 import src.models.camelot.model_utils as model_utils
@@ -617,6 +617,15 @@ class CAMELOT(tf.keras.Model):
         return config
 
 
+DEFAULT_TRAIN_PARAMS = {
+    "lr": 0.001,
+    "epochs_init": 100,
+    "epochs": 100,
+    "bs": 32,
+    "cbck_str": "auc-sup-scores-cm"
+}
+
+
 class Model:
     """
     Class for fitting and evaluating Camelot architecture model.
@@ -631,7 +640,7 @@ class Model:
         self.model = None
         self.run_num = 1
 
-    def fit(self, train_params):
+    def fit(self, train_params=DEFAULT_TRAIN_PARAMS):
         """
         Fit method for training CAMELOT model.
 
@@ -725,7 +734,7 @@ class Model:
         # Fourth, save model init losses
         init_loss_1 = self.model.enc_pred_loss_tracker
         init_loss_2 = self.model.iden_loss_tracker
-        enc_pred_tracker.index.name, iden_tracker.index.name = "epoch", "epoch"
+        init_loss_1.index.name, init_loss_2.index.name = "epoch", "epoch"
 
         # Fifth, compute attention scores
         alpha, beta, gamma = self.model.compute_unnorm_attention_weights(X_test)

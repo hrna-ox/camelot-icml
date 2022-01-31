@@ -1,12 +1,23 @@
-# File description
+# Processing script for initial ED admission processing.
 
 import os
 import pandas as pd
 
-import src as utils
+import src.data_processing.MIMIC.data_utils as utils
 
 ####################################################
 """
+
+Processing Steps:
+
+1. Compute recorded intime and outimes for each ED admission.
+2. Select admissions with ED as the first admission.
+3. Remove admissions admitted to special wards, including Partum and Psychiatry. Compute next transfer information.
+4. Add patient core information.
+5. Remove admissions without triage information.
+
+
+Other notes.
 ROW SUBSETTING COULD BE IMPROVED SOMEHOW
 
 DOUBLE CHECK ON ELECTIVE VS SURGICAL ADMISSIONS
@@ -74,6 +85,7 @@ if __name__ == "__main__":
     # ADD patient core information and next Transfer Information.
     patients_S3 = admissions_ed_S3.subject_id.values
     admissions_ed_S3.loc[:, PATIENT_INFO] = patients_core.set_index("subject_id").loc[patients_S3, PATIENT_INFO].values
+
     for col in NEXT_TRANSFER_INFO:
         admissions_ed_S3.loc[:, "next_" + col] = transfers_to_relevant_wards.set_index("subject_id").loc[
             patients_S3, col].values
@@ -88,6 +100,7 @@ if __name__ == "__main__":
     # Compute and remove ESI NAN and save
     admissions_ed_S4["ESI"] = triage_ed.set_index("stay_id").loc[admissions_ed_S4.stay_id.values, "acuity"].values
     admissions_ed_S5 = admissions_ed_S4[~ admissions_ed_S4["ESI"].isna()]
+
 
     # Save data
     admissions_ed_S5.to_csv(SAVE_FD + "admissions_intermediate.csv", index=True, header=True)

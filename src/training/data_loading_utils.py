@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+from src.data_processing.MIMIC.data_utils import convert_to_timedelta
 
 # ---------------------------------------------------------------------------------------
 "Global variables for specific dataset information loading."
@@ -18,9 +19,11 @@ HAVEN_BIOCHEM = ['ALB', 'CR', 'CRP', 'POT', 'SOD', 'UR']
 HAVEN_STATIC = ['age', 'gender', 'is_elec', 'is_surg']
 HAVEN_OUTCOME_NAMES = ['Healthy', 'Death', 'ICU', 'Card']
 
-MIMIC_PARSE_TIME_VARS = None
-MIMIC_VITALS = None
-MIMIC_STATIC = None
+MIMIC_PARSE_TIME_VARS = ["intime", "outtime", "chartmax"]
+MIMIC_PARSE_TD_VARS = ["sampled_time_to_end(1H)", "time_to_end", "time_to_end_min", "time_to_end_max"]
+MIMIC_VITALS = ["TEMP", "HR", "RR", "SPO2", "SBP", "DBP"]
+MIMIC_STATIC = ["age", "gender", "ESI"]
+MIMIC_OUTCOME_NAMES = ["De", "I", "W", "Di"]
 
 # ----------------------------------------------------------------------------------------
 "Useful functions to define"
@@ -49,7 +52,8 @@ def _get_features(key, data_name="HAVEN"):
             static = HAVEN_STATIC
 
         elif data_name == "MIMIC":
-            vitals, vars1, vars2, static = None, None, None, None
+            vitals = MIMIC_VITALS
+            static = MIMIC_STATIC
 
         elif data_name == "SAMPLE":
             vitals, vars1, vars2, static = None, None, None, None
@@ -57,7 +61,7 @@ def _get_features(key, data_name="HAVEN"):
         else:
             raise ValueError(f"Data Name does not match available datasets. Input provided {data_name}")
 
-        # Add features given substrings of key. We initialise setin case of repition (e.g. 'vars1-lab')
+        # Add features given substrings of key. We initialise set in case of repetition (e.g. 'vars1-lab')
         features = set([])
         if "vit" in key.lower():
             features.update(vitals)
@@ -112,8 +116,7 @@ def _numpy_backward_fill(array):
 
     # Add time indices where not masked, and propagate backward
     inter_array = np.where(~ array_mask, np.arange(array_mask.shape[1]).reshape(1, -1, 1), array_mask.shape[1] - 1)
-    inter_array = np.minimum.accumulate(inter_array[:, ::-1], axis=1)[:,
-                  ::-1]  # For each (n, t, d) missing value, get the previously accessible mask value
+    inter_array = np.minimum.accumulate(inter_array[:, ::-1], axis=1)[:,::-1]
     array_out = array_out[np.arange(array_out.shape[0])[:, None, None],
                           inter_array,
                           np.arange(array_out.shape[-1])[None, None, :]]
@@ -152,13 +155,13 @@ def impute(X):
     return impute_step3, mask
 
 
-def load(data_folder):
+def load(data_folder, window=4):
     """Load Trajectory, Target data jointly given data folder."""
 
     # Check Processed data folder exists
     try:
         assert os.path.exists(data_folder)
-    except Exception:
+    except AssertionError:
         print(f"Folder does not Exist. Check data has been processed. Input to the load function is {data_folder}.")
 
     if "HAVEN" in data_folder:
@@ -166,8 +169,9 @@ def load(data_folder):
         y = pd.read_csv(data_folder + "copd_outcomes.csv", index_col=0)
 
     elif "MIMIC" in data_folder:
-        X = None
-        y = None
+        X = pd.read_csv(data_folder + "vitals_process.csv", parse_dates=MIMIC_PARSE_TIME_VARS, header=0, index_col=0)
+        X = convert_to_timedelta(X, *MIMIC_PARSE_TD_VARS)
+        y = pd.read_csv(data_folder + f"outcomes_{window}h_process.csv", index_col=0)
 
     elif "SAMPLE" in data_folder:
         X = None
@@ -178,6 +182,29 @@ def load(data_folder):
 
     return X, y
 
+def get_ids(data_folder):
+    """Get input id information."""
+
+    # Check Processed data folder exists
+    try:
+        assert os.path.exists(data_folder)
+    except AssertionError:
+        print(f"Folder does not Exist. Check data has been processed. Input to the load function is {data_folder}.")
+
+    if "HAVEN" in data_folder:
+        id_col, time_col, needs_time_to_end = "subject_id", "charttime", True
+
+    elif "MIMIC" in data_folder:
+        id_col, time_col, needs_time_to_end = "hadm_id", "sampled_time_to_end(1H)", False
+
+    elif "SAMPLE" in data_folder:
+        id_col, time_col, needs_time_to_end = None, None, None
+
+    else:
+        raise ValueError(f"Data Name does not match available datasets. Input Folder provided {data_folder}")
+
+    return id_col, time_col, needs_time_to_end
+
 
 def _get_outcome_names(data_name):
     """Return the corresponding outcome columns given dataset name."""
@@ -185,7 +212,7 @@ def _get_outcome_names(data_name):
         return HAVEN_OUTCOME_NAMES
 
     elif data_name == "MIMIC":
-        return None
+        return MIMIC_OUTCOME_NAMES
 
     elif data_name == "SAMPLE":
         return None
@@ -196,19 +223,21 @@ def _check_input_format(X, y):
 
     try:
         # Length and shape conditions
-        assert X.shape[0] == y.shape[0]
-        assert len(X.shape) == 3
-        assert len(y.shape) == 2
+        cond1 = X.shape[0] == y.shape[0]
+        cond2 = len(X.shape) == 3
+        cond3 = len(y.shape) == 2
 
         # Check non-missing values
-        assert np.sum(np.isnan(X)) + np.sum(np.isnan(y)) == 0
-
-        # Check normalisation
-        # assert np.all(np.abs(np.amin(X, axis=0)) < 1e-8)
-        # assert np.all(np.abs(np.nanmax(X, axis=0) - np.nanmin(X, axis=0)) - 1 < 1e-8)
+        cond4 = np.sum(np.isnan(X)) + np.sum(np.isnan(y)) == 0
 
         # Check y output is one hot encoded
-        assert np.all(np.sum(y, axis=1) == 1)
+        cond5 = np.all(np.sum(y, axis=1) == 1)
+
+        assert cond1
+        assert cond2
+        assert cond3
+        assert cond4
+        assert cond5
 
     except Exception as e:
         print(e)
@@ -219,34 +248,57 @@ def _check_input_format(X, y):
 "Main Class for Data Processing."
 
 
+def _subset_to_balanced(X, y, mask, ids):
+    """Subset samples so dataset is more well sampled."""
+    class_numbers = np.sum(y, axis=0)
+    largest_class, target_num_samples = np.argmax(class_numbers), np.sort(class_numbers)[-2]
+    print("Subsetting class {} from {} to {} samples.".format(largest_class, class_numbers[largest_class],
+                                                              target_num_samples))
+
+    # Select random
+    largest_class_ids = np.arange(y.shape[0])[y[:, largest_class] == 1]
+    class_ids_samples = np.random.choice(largest_class_ids, size=target_num_samples, replace=False)
+    ids_to_remove_ = np.setdiff1d(largest_class_ids, class_ids_samples)
+
+    # Remove relevant ids
+    X_out = np.delete(X, ids_to_remove_, axis=0)
+    y_out = np.delete(y, ids_to_remove_, axis=0)
+    mask_out = np.delete(mask, ids_to_remove_, axis=0)
+    ids_out = np.delete(ids, ids_to_remove_, axis=0)
+
+    return X_out, y_out, mask_out, ids_out
+
+
 class DataProcessor:
     """
     Data Processor Class for Data Loading and conversion to input. By default, time columns should be in dt.datetime
     format and are converted to hours.
 
     Params:
-        - id_column: str, identifier for each admission/patient.
-        - time_column: str, identifier of temporal id column.
+        - data_name: str, which dataset to load
+        - outcome_window: str, how many hours to outcome from outtime admission.
         - feat_set: str or list. If list, list of features to consider for input. If str, convert to list according
         to corresponding name.
         - time_range: tuple of floats, for each admission, consider only admissions between these endpoints.
         - include_time: bool, indicates whether to add time difference between consecutive observations as a variable.
     """
 
-    def __init__(self, data_name="HAVEN", id_column='subject_id', time_column='charttime', feat_set='vitals',
-                 time_range=(24, 72), include_time=False, **kwargs):
+    def __init__(self, data_name="HAVEN", feat_set='vitals',
+                 time_range=(24, 72), outcome_window=4, include_time=False, **kwargs):
 
-        # Dataset selection
+        # Dataset selection and feature subset
         self.dataset_name = data_name
-
-        # Identifiers for patient, time and feature subset
-        self.id_col = id_column
-        self.time_col = time_column
+        self.outcome_window = outcome_window
         self.feat_set = feat_set
 
         # Subset observations between time range and decide whether to include time as another feature.
         self.time_range = time_range
         self.include_time = include_time
+
+        # Ids depending on data
+        self.id_col = None
+        self.time_col = None
+        self.needs_time_to_end_computation = False
 
         # Mean, Divisor for normalisation. Initialise to None.
         self.min = None
@@ -262,7 +314,8 @@ class DataProcessor:
     def load(self):
         """Load Dataset according to given parameters."""
         data_folder = f"data/{self.dataset_name}/processed/"
-        data = load(data_folder)
+        data = load(data_folder, window=self.outcome_window)
+        self.id_col, self.time_col, self.needs_time_to_end_computation = get_ids(data_folder)
 
         return data
 
@@ -272,7 +325,7 @@ class DataProcessor:
         # Expand data
         x, y = data
 
-        # Add Time to End and Truncate
+        # Add Time to End and Truncate if needed
         x_inter = self._add_time_to_end(x)
         x_inter = self._truncate(x_inter)
         self._check_correct_time_conversion(x_inter)
@@ -281,10 +334,10 @@ class DataProcessor:
         x_subset, features = self.subset_to_features(x_inter)
 
         # Convert to 3D array
-        x_inter, pat_time_ids = self.convert_to_3Darray(x_subset)
+        x_inter, pat_time_ids = self.convert_to_3darray(x_subset)
 
         # Normalise array
-        # x_inter = self.normalise(x_inter)
+        x_inter = self.normalise(x_inter)
 
         # Impute missing values
         x_out, mask = impute(x_inter)
@@ -297,20 +350,26 @@ class DataProcessor:
         # Check data loaded correctly
         _check_input_format(x_out, y_out)
 
-        return x_out.astype("float32"), y_out.astype("float32"), mask, pat_time_ids, features, outcomes, x_subset, y_data
+        return x_out.astype("float32"), y_out.astype(
+            "float32"), mask, pat_time_ids, features, outcomes, x_subset, y_data
 
     def _add_time_to_end(self, X):
         """Add new column to dataframe - this computes time to end of grouped observations."""
         x_inter = X.copy(deep=True)
 
-        # Compute datetime values for time until end of group of observations
-        times = X.groupby(self.id_col).apply(lambda x:
-                                             x.loc[:, self.time_col].max() - x.loc[:, self.time_col])
+        if self.needs_time_to_end_computation:
+            # Compute datetime values for time until end of group of observations
+            times = X.groupby(self.id_col).apply(lambda x:
+                                                 x.loc[:, self.time_col].max() - x.loc[:, self.time_col])
 
-        # add column to dataframe after converting to hourly times.
-        x_inter["time_to_end"] = convert_datetime_to_hour(times).values
+            # add column to dataframe after converting to hourly times.
+            x_inter["time_to_end"] = convert_datetime_to_hour(times).values
 
-        return x_inter.sort_values(by = [self.id_col, "time_to_end"], ascending = [True, False])
+        else:
+            x_inter["time_to_end"] = x_inter[self.time_col].values
+            x_inter["time_to_end"] = convert_datetime_to_hour(x_inter.loc[:, "time_to_end"])
+
+        return x_inter.sort_values(by=[self.id_col, "time_to_end"], ascending=[True, False])
 
     def _truncate(self, X):
         """Truncate dataset on time to end column according to self.time_range."""
@@ -326,7 +385,7 @@ class DataProcessor:
 
         cond1 = X[self.id_col].is_monotonic
         cond2 = X.groupby(self.id_col).apply(lambda x: x["time_to_end"].is_monotonic_decreasing).all()
-        
+
         min_time, max_time = self.time_range
         cond3 = X["time_to_end"].between(min_time, max_time, inclusive='left').all()
 
@@ -334,14 +393,13 @@ class DataProcessor:
         assert cond2 == True
         assert cond3 == True
 
-
     def subset_to_features(self, X):
         """Subset only to variables which were selected"""
         features = [self.id_col, "time_to_end"] + _get_features(self.feat_set, self.dataset_name)
 
         return X[features], features
 
-    def convert_to_3Darray(self, X):
+    def convert_to_3darray(self, X):
         """Convert a pandas dataframe to 3D numpy array of shape (num_samples, num_timesteps, num_variables)."""
 
         # Obtain relevant shape sizes

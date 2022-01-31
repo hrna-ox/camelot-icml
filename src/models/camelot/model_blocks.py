@@ -107,7 +107,7 @@ class MLP(Layer):
 
         # Regularization params
         self.dropout = dropout
-        self.regulariser = mix_l1_l2_reg(regulariser_params)
+        self.regulariser = mix_l1_l2_reg(*regulariser_params)
 
         # Seed
         self.seed = seed
@@ -355,7 +355,7 @@ class LSTMEncoder(Layer):
         self.dropout = dropout
         self.recurrent_dropout = recurrent_dropout
         self.regulariser_params = regulariser_params
-        self.regulariser = mix_l1_l2_reg(regulariser_params)
+        self.regulariser = mix_l1_l2_reg(*regulariser_params)
 
         # Add Intermediate Layers
         for layer_id_ in range(self.hidden_layers):
@@ -437,7 +437,7 @@ class AttentionRNNEncoder(LSTMEncoder):
 
         # Compute representation through feature time attention layer
         attention_inputs = (inputs, latent_reps)
-        z = self.feature_time_att_layer(attention_inputs)
+        z = self.feat_time_attention_layer(attention_inputs)
 
         return z
 

@@ -1,17 +1,18 @@
-# INSERT FILE DESCRIPTION
+# Processing
 
 
+import datetime as dt
 # ------------------------- Imports --------------------------------
 import os
-import datetime as dt
 
 import pandas as pd
 
-import src as utils
-import src as test
+import src.data_processing.MIMIC.data_utils as utils
+import src.data_processing.MIMIC.test as test
 
 # ------------------------ Checking Data Loaded -------------------------------
-from src import SAVE_FD
+from src.data_processing.MIMIC.admissions_processing import SAVE_FD, DATA_FD
+from src.data_processing.MIMIC.vitals_processing import resampling_rule
 
 try:
     assert os.path.exists(SAVE_FD + "admissions_intermediate.csv")
@@ -19,30 +20,19 @@ try:
 except Exception:
     raise ValueError(f"Run admissions_processing.py and vitals_processing.py prior to running '{__file__}'")
 
-
-
-
-
-
 # ------------------------ Configuration params --------------------------------
-"Global and Argument variables for Vital sign processing"
-from src import DATA_FD, SAVE_FD, resampling_rule
+"""
+Global and Argument variables for Vital sign processing.
+"""
 TIME_VARS = ["intime", "outtime", "next_intime", "next_outtime", "dod"]
 VITALS_TIME_VARS = ["intime", "outtime", "time_to_end_min", "time_to_end_max",
                     "time_to_end", f"sampled_time_to_end({resampling_rule})"]
-# parser = argparse.ArgumentParser()
-# parser.parse_args()
-
-
-
-
-
 
 # ------------------------ Data Loading ------------------------------
-admissions = pd.read_csv(SAVE_FD + "admissions_intermediate.csv", index_col = 0, header = 0, parse_dates = TIME_VARS)
-vitals = pd.read_csv(SAVE_FD + "vitals_intermediate.csv", index_col = 0, header = 0, parse_dates = VITALS_TIME_VARS)
-transfers_core = pd.read_csv(DATA_FD + "core/transfers.csv", index_col = None, header = 0,
-                             parse_dates = ["intime", "outtime"])
+admissions = pd.read_csv(SAVE_FD + "admissions_intermediate.csv", index_col=0, header=0, parse_dates=TIME_VARS)
+vitals = pd.read_csv(SAVE_FD + "vitals_intermediate.csv", index_col=0, header=0, parse_dates=VITALS_TIME_VARS)
+transfers_core = pd.read_csv(DATA_FD + "core/transfers.csv", index_col=None, header=0,
+                             parse_dates=["intime", "outtime"])
 vitals = utils.convert_to_timedelta(vitals, f"sampled_time_to_end({resampling_rule})", "time_to_end", "time_to_end_min",
                                     "time_to_end_max")
 
@@ -50,101 +40,67 @@ vitals = utils.convert_to_timedelta(vitals, f"sampled_time_to_end({resampling_ru
 test.admissions_processed_correctly(admissions)
 test.vitals_processed_correctly(vitals)
 
-
-
-
 # ------------------------ Targets Processing -----------------------------
-# ## transfers_subset = utils.subsetted_by(transfers_core, admissions, ["hadm_id"])
+admissions_subset = utils.subsetted_by(admissions, vitals, ["stay_id"])
+transfers_subset = utils.subsetted_by(transfers_core, admissions_subset, ["subject_id", "hadm_id"])
+vitals["chartmax"] = vitals["outtime"] - vitals["time_to_end"]
+vitals["hadm_id"] = admissions.set_index("stay_id").loc[vitals.stay_id.values, "hadm_id"].values
 
-
-# Save vitals
-vitals = vitals_subset
-cohort_v3 = vitals.groupby("stay_id", as_index=False).apply(
-    lambda x: x[["subject_id", "stay_id", "intime", "outtime", "chartmin", "chartmax"]].iloc[0, :]).reset_index(drop = True)
-cohort_v3["hadm_id"] = cohort_v2.copy().set_index("subject_id", drop = True).loc[cohort_v3.subject_id.values, "hadm_id"].astype(int).values
-vitals["hadm_id"] = cohort_v3.copy().set_index("subject_id", drop = True).loc[vitals.subject_id.values, "hadm_id"].astype(int).values
 
 """
 Potential Outcomes will be regular admission to acute ward, ICU or death
 """
-transfer_cohort = transfer_all[transfer_all.hadm_id.isin(cohort_v3.hadm_id) & transfer_all.subject_id.isin(cohort_v3.subject_id)]
-hours = 12
-def select_death_icu_acute(df, vitals_df, admissions_df, hours = 12):
-    """
-    Identify outcomed based on severity within the consequent 12 hours:
-    a) Death
-    b) Entry to ICU Careunit
-    c) Transfer to hospital ward
-    d) Discharge
-
-    Returns categorical encoding of the corresponding admission.
-    Else returns 0,0,0,0 if a mistake is found.
-    """
-
-    # Identify Last observed vitals for corresponding admission
-    hadm_match = vitals_df["hadm_id"] == df.name
-    subject_match = vitals_df["subject_id"] == df.subject_id.iloc[0]
-    max_vitals_obvs = vitals_df[hadm_match & subject_match].chartmax.max()
-
-    # Consider only transfers after vitals
-    transfers_within_hours = df[df["intime"].between(max_vitals_obvs, max_vitals_obvs + dt.timedelta(hours = hours))]
-    assert admissions_df.hadm_id.eq(df.name).sum() <= 1
-
-
-    # First check if death exists
-    hadm_information = admissions_df.query("hadm_id==@df.name")
-    if not hadm_information.empty and not hadm_information.deathtime.isna().all():
-        time_of_death = hadm_information.deathtime.min()
-        time_from_vitals = (time_of_death - max_vitals_obvs).total_seconds()
-
-        try:
-            assert time_from_vitals >= 0
-        except Exception:
-            return pd.Series(data = [0,0,0,0], index = ["De", "I", "W", "Di"])
-
-        if  time_from_vitals < (hours * 3600):
-            return pd.Series(data = [1,0,0,0],
-                                index = ["De", "I", "W", "Di"])
-
-    # Then consider ICU
-    icu_cond1 = transfers_within_hours.careunit.str.contains("(?i)ICU", na = False) #regex ignore lowercase
-    # icu_cond2 = transfers_within_hours.careunit.str.contains("(?i)Neuro Stepdown", na = False) #regex ignore lowercase
-    # icu_cond3 = transfers_within_hours.careunit.str.contains("(?i)Coronary Care Unit (CCU)", na = False) #regex ignore lowercase
-    # icu_cond4 = transfers_within_hours.careunit.str.contains("(?i)Neuro Intermediate", na = False) #regex ignore lowercase
-    has_icus = (icu_cond1).sum() > 0
-
-    if has_icus:
-        return pd.Series(data=[0, 1, 0, 0],
-                            index =["De", "I", "W", "Di"])
-
-    # Check to see if discharge has taken
-    is_discharged = transfers_within_hours.eventtype.str.contains("discharge", na = False).sum() > 0
-    if is_discharged:
-        return pd.Series(data = [0, 0, 0, 1],
-                            index=["De", "I", "W", "Di"]
-                            )
-    else:
-        return pd.Series(data = [0, 0, 1, 0],
-                            index=["De", "I", "W", "Di"]
-                            )
+time_window_1 = dt.timedelta(hours=4)
+time_window_2 = dt.timedelta(hours=12)
+time_window_3 = dt.timedelta(hours=24)
+time_window_4 = dt.timedelta(hours=48)
 
 # Need to include Death
-outcomes_try_1 = transfer_cohort.groupby("hadm_id", as_index = True).apply(
-    lambda x: select_death_icu_acute(x, vitals, admissions_all, hours))
+outcomes_4_hours = transfers_subset.groupby("hadm_id", as_index=True).apply(
+            lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_1))
+outcomes_12_hours = transfers_subset.groupby("hadm_id", as_index=True).apply(
+            lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_2))
+outcomes_24_hours = transfers_subset.groupby("hadm_id", as_index=True).apply(
+            lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_3))
+outcomes_48_hours = transfers_subset.groupby("hadm_id", as_index=True).apply(
+            lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_4))
 
-# Ignore those patients with mistakes
-outcomes = outcomes_try_1[~ outcomes_try_1.eq(0).all(axis = 1)]
-vitals_df = vitals[vitals["hadm_id"].isin(outcomes.index.values)]
-cohort = cohort_v3[cohort_v3["hadm_id"].isin(outcomes.index.values)]
 
-assert set(vitals_df.hadm_id.values) == (set(outcomes.index))
-assert set(cohort.hadm_id.values) == (set(outcomes.index))
+print(outcomes_4_hours.iloc[:, :-1].sum(axis=0))
+print(outcomes_12_hours.iloc[:, :-1].sum(axis=0))
+print(outcomes_24_hours.iloc[:, :-1].sum(axis=0))
+print(outcomes_48_hours.iloc[:, :-1].sum(axis=0))
+
+# Ensure all patients have only one class
+assert outcomes_4_hours.iloc[:, :-1].sum(axis=1).eq(1).all()
+assert outcomes_12_hours.iloc[:, :-1].sum(axis=1).eq(1).all()
+assert outcomes_24_hours.iloc[:, :-1].sum(axis=1).eq(1).all()
+assert outcomes_48_hours.iloc[:, :-1].sum(axis=1).eq(1).all()
+
+# Subset vitals and admission data
+admissions_keep = outcomes_4_hours.index.tolist()
+admissions_final = admissions_subset[admissions_subset.hadm_id.isin(admissions_keep)]
+vitals_final = vitals[vitals.hadm_id.isin(admissions_keep)]
+
+static_vars = ["gender", "age", "ESI"]
+vitals_final[static_vars] = admissions_final.set_index("hadm_id").loc[vitals_final.hadm_id.values, static_vars].values
+vitals_final["gender"] = vitals_final.loc[:, "gender"].replace(to_replace=["M", "F"], value=[1,0])
+vitals_final["charttime"] = vitals_final.loc[:, "outtime"].values - vitals_final.loc[:, "sampled_time_to_end(1H)"].values
 
 # Save to output variables
-os.chdir("mimic-iv-ed/data/")
+process_fd = DATA_FD + "processed/"
 
-if not os.path.exists("derived/"):
-    os.makedirs("derived/")
-vitals_df.to_csv("derived/vitals.csv", index = True, header = True)
-outcomes.to_csv("derived/outcomes.csv", index = True, header = True)
-cohort.to_csv("derived/cohort.csv", index = True, header = True)
+if not os.path.exists(process_fd):
+    os.makedirs(process_fd)
+
+# Save general
+vitals_final.to_csv(SAVE_FD + "vitals_final.csv", index=True, header=True)
+admissions_final.to_csv(SAVE_FD + "admissions_final.csv", index=True, header=True)
+
+# Save for input
+vitals_final.to_csv(process_fd + "vitals_process.csv", index=True, header=True)
+admissions_final.to_csv(process_fd + "admissions_process.csv", index=True, header=True)
+outcomes_4_hours.to_csv(process_fd + "outcomes_4h_process.csv", index=True, header=True)
+outcomes_12_hours.to_csv(process_fd + "outcomes_12h_process.csv", index=True, header=True)
+outcomes_24_hours.to_csv(process_fd + "outcomes_24h_process.csv", index=True, header=True)
+outcomes_48_hours.to_csv(process_fd + "outcomes_48h_process.csv", index=True, header=True)
