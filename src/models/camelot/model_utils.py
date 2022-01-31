@@ -23,7 +23,7 @@ from sklearn.metrics import normalized_mutual_info_score, silhouette_score
 LOGS_DIR = "experiments/camelot/"
 
 
-def log(tensor):
+def tf_log(tensor):
     return tf.cast(tf.math.log(tensor + 1e-8), dtype="float32")
 
 
@@ -35,7 +35,7 @@ def purity_score(y_true, y_pred):
     # compute confusion matrix
     contingency_matrix_ = contingency_matrix(y_true, y_pred)
 
-    return np.sum(np.amax(contingency_matrix_, axis=0)) / np.sum(contingency_matrix_)
+    return np.sum(np.amax(contingency_matrix_, axis=0)) / np.sum(contingency_matrix_ + 1e-8)
 
 
 def supervised_scores(y_true, y_pred):
@@ -120,7 +120,7 @@ def l_pred(y_true, y_pred, weights=None, name='pred_clus_loss'):
         weights = tf.cast(tf.constant(np.ones(shape=y_true.shape) / y_true.shape[-1]), dtype=np.float32)
 
     # Compute batch
-    batch_neg_ce = tf.reduce_sum(weights * y_true * log(y_pred), axis=-1)
+    batch_neg_ce = - tf.reduce_sum(weights * y_true * tf_log(y_pred))
 
     # Average over batch
     loss_value = tf.reduce_mean(batch_neg_ce, name=name)
@@ -147,7 +147,7 @@ def l_clus(cluster_reps, name='embedding_sep_loss'):
 
     # Compute pairwise Euclidean distance between cluster vectors, and sum over pairs of clusters.
     pairwise_loss = tf.reduce_sum((embedding_column - embedding_row) ** 2, axis=-1)
-    loss = - tf.reduce_sum(pairwise_loss, axis=None, name=name)
+    loss = - tf.reduce_sum(pairwise_loss, axis=None, name=name) - 1e-8
 
     # normalise by factor
     K = cluster_reps.get_shape()[0]
@@ -173,7 +173,7 @@ def l_dist(clusters_prob):
     clus_avg_prob = tf.reduce_mean(clusters_prob, axis=0)
 
     # Compute negative entropy
-    neg_entropy = tf.reduce_sum(clus_avg_prob * log(clus_avg_prob))
+    neg_entropy = tf.reduce_sum(clus_avg_prob * tf_log(clus_avg_prob))
 
     return neg_entropy
 
@@ -201,7 +201,7 @@ class CEClusSeparation(cbck.Callback):
         # Compute outcome weights if weighted=True
         if weighted is True:
             class_numbers = tf.reduce_sum(self.y_val, axis=0).numpy()
-            self.weights = class_numbers / np.sum(class_numbers)
+            self.weights = class_numbers / np.sum(class_numbers + 1e-8)
 
         else:
             self.weights = np.ones(shape=(self.y_val.get_shape()[0]))
@@ -405,37 +405,38 @@ class UnsupervisedTargetMetrics(cbck.Callback):
                         SIL {sil:.2f}, {sil_l:.2f}""")
 
 
-def cbck_list(summary_name: str):
+def cbck_list(summary_name: str, interval: int = 5):
     """
     Shorthand for callbacks above.
 
     Params:
     - summary_name: str containing shorthands for different callbacks.
+    - interval: int interval to print information on.
     """
-    extra_callback_list = set([])
+    extra_callback_list = []
 
     if "auc" in summary_name.lower() or "roc" in summary_name.lower():
-        extra_callback_list.update([AUROC])
+        extra_callback_list.append(AUROC(interval=interval))
 
     if "clus_sep" in summary_name.lower() or "clus_phen" in summary_name.lower():
-        extra_callback_list.update([CEClusSeparation])
+        extra_callback_list.append(CEClusSeparation(interval=interval))
 
     if "cm" in summary_name.lower() or "conf_matrix" in summary_name.lower():
-        extra_callback_list.update([ConfusionMatrix])
+        extra_callback_list.append(ConfusionMatrix(interval=interval))
 
     if "clus_info" in summary_name.lower():
-        extra_callback_list.update([PrintClusterInfo])
+        extra_callback_list.append(PrintClusterInfo(interval=interval))
 
     if "sup_scores" in summary_name.lower():
-        extra_callback_list.update([SupervisedTargetMetrics])
+        extra_callback_list.append(SupervisedTargetMetrics(interval=interval))
 
     if "unsup_scores" in summary_name.lower():
-        extra_callback_list.update([UnsupervisedTargetMetrics])
+        extra_callback_list.append(UnsupervisedTargetMetrics)
 
     return list(extra_callback_list)
 
 
-def get_callbacks(track_loss: str, other_cbcks: str = "", early_stop: bool = True, lr_scheduler: bool = True,
+def get_callbacks(track_loss: str, interval: int = 5, other_cbcks: str = "", early_stop: bool = True, lr_scheduler: bool = True,
                   tensorboard: bool = True,
                   min_delta: float = 0.0001, patience: int = 100):
     """
@@ -443,6 +444,7 @@ def get_callbacks(track_loss: str, other_cbcks: str = "", early_stop: bool = Tru
 
     Params:
         - track_loss: str, name of main loss to keep track of.
+        - interval: int, interval to print information on.
         - other_cbcks: str, list of other callbacks to consider (default = "", which selects None).
         - early_stop: whether to stop training early in case of no progress. (default = True)
         - lr_scheduler: dynamically update learning rate. (default = True)
@@ -450,7 +452,7 @@ def get_callbacks(track_loss: str, other_cbcks: str = "", early_stop: bool = Tru
         - min_delta: if early stopping, the interval on which to check improvement or not.
         - patience: how many epochs to wait until checking for improvements.
         """
-    callbacks = set([])
+    callbacks = []
 
     # Handle saving paths and folders
     logs_dir = LOGS_DIR
@@ -472,29 +474,29 @@ def get_callbacks(track_loss: str, other_cbcks: str = "", early_stop: bool = Tru
     # ------------------ Start Loading callbacks ---------------------------
 
     # Load custom callbacks first
-    callbacks.update(cbck_list(other_cbcks))
+    callbacks.extend(cbck_list(other_cbcks, interval))
 
     # Model Weight saving callback
     checkpoint = cbck.ModelCheckpoint(filepath=save_fd + "models/checkpoints/epoch-{epoch}", save_best_only=True,
                                       monitor=track_loss, save_freq="epoch")
-    callbacks.update([checkpoint])
+    callbacks.append(checkpoint)
 
-    # Logging Loss values
-    csv_logger = cbck.CSVLogger(filename=save_fd + "training/loss_tracker.csv", separator=",", append=True)
-    callbacks.update([csv_logger])
+    # Logging Loss values)
+    csv_logger = cbck.CSVLogger(filename=save_fd + "training/loss_tracker", separator=",", append=False)
+    callbacks.append(csv_logger)
 
     # Check if Early stoppage is added
     if early_stop:
-        callbacks.update([cbck.EarlyStopping(monitor='val_' + track_loss, mode="min", restore_best_weights=True,
-                                             min_delta=min_delta, patience=patience)])
+        callbacks.append(cbck.EarlyStopping(monitor='val_' + track_loss, mode="min", restore_best_weights=True,
+                                            min_delta=min_delta, patience=patience))
 
     # Check if LR Scheduling is in place
     if lr_scheduler:
-        callbacks.update([cbck.ReduceLROnPlateau(monitor='val_' + track_loss, mode='min', cooldown=15,
-                                                 min_lr=0.00001, factor=0.25)])
+        callbacks.append(cbck.ReduceLROnPlateau(monitor='val_' + track_loss, mode='min', cooldown=15,
+                                                min_lr=0.00001, factor=0.25))
 
     # Check if Tensorboard is active
     if tensorboard:
-        callbacks.update([cbck.TensorBoard(log_dir=save_fd + "logs/", histogram_freq=1)])
+        callbacks.append(cbck.TensorBoard(log_dir=save_fd + "logs/", histogram_freq=1))
 
     return callbacks, run_num

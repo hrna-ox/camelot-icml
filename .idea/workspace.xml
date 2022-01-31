@@ -2,7 +2,13 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="e4ecba8e-2901-44aa-817c-245a30485212" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/src/visualisation/31-01-2022.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/visualisation/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/models/camelot/model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/camelot/model.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/models/camelot/model_blocks.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/camelot/model_blocks.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/models/camelot/model_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/camelot/model_utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/training/single_run.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/training/single_run.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -38,7 +44,12 @@
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/src/visualisation" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\hruia\PycharmProjects\camelot-icml\src\visualisation" />
+    </key>
   </component>
   <component name="RunManager" selected="Python.single_run">
     <configuration name="admissions_processing" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
@@ -144,7 +155,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1643547888513</updated>
-      <workItem from="1643547890996" duration="26780000" />
+      <workItem from="1643547890996" duration="43383000" />
     </task>
     <servers />
   </component>
@@ -175,6 +186,31 @@
           <line>75</line>
           <option name="timeStamp" value="4" />
         </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/src/models/camelot/model.py</url>
+          <line>420</line>
+          <option name="timeStamp" value="5" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/src/models/camelot/model.py</url>
+          <line>464</line>
+          <option name="timeStamp" value="6" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/src/models/camelot/model.py</url>
+          <line>548</line>
+          <option name="timeStamp" value="7" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/src/models/camelot/model.py</url>
+          <line>198</line>
+          <option name="timeStamp" value="8" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/src/models/camelot/model.py</url>
+          <line>150</line>
+          <option name="timeStamp" value="9" />
+        </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
   </component>
@@ -182,6 +218,6 @@
     <SUITE FILE_PATH="coverage/camelot_icml$admissions_processing.coverage" NAME="admissions_processing Coverage Results" MODIFIED="1643548941711" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/camelot_icml$vitals_processing.coverage" NAME="vitals_processing Coverage Results" MODIFIED="1643569467121" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/camelot_icml$targets_processing.coverage" NAME="targets_processing Coverage Results" MODIFIED="1643576233116" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/camelot_icml$single_run.coverage" NAME="single_run Coverage Results" MODIFIED="1643578178129" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/camelot_icml$single_run.coverage" NAME="single_run Coverage Results" MODIFIED="1643637092282" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>

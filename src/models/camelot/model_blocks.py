@@ -69,7 +69,7 @@ def _norm_abs(array, axis: int = 1):
     returns:
     - normalised array according to axis.
     """
-    array_abs = tf.math.abs(array)
+    array_abs = tf.math.abs(array) + 1e-8
 
     output = array_abs / tf.reduce_sum(array_abs, axis=axis, keepdims=True)
 

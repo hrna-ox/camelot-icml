@@ -247,11 +247,14 @@ class CAMELOT(tf.keras.Model):
         """
 
         # Unpack inputs
-        x, y = inputs
+        x, y = inputs[0], inputs[1]
+        assert not np.any(np.isnan(x))
+        assert not np.any(np.isnan(y))
 
         # Define variables for each network
-        pred_vars = [var for var in self.trainable_variables if 'Predictor' in var.name]
-        enc_id_vars = [var for var in self.trainable_variables if 'Encoder' in var.name or 'Identifier' in var.name]
+        pred_vars = [var for var in self.trainable_variables if 'predictor' in var.name.lower()]
+        enc_id_vars = [var for var in self.trainable_variables if 'encoder' in var.name.lower() or
+                       'identifier' in var.name.lower()]
         rep_vars = self.cluster_rep_set
 
         # Initialise GradientTape to compute gradients
@@ -264,7 +267,8 @@ class CAMELOT(tf.keras.Model):
             # compute losses
             l_pred = model_utils.l_pred(y, y_pred, weights=self.loss_weights)
             l_enc_id = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.alpha * model_utils.l_dist(pi)
-            l_clus = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.beta * model_utils.l_clus(rep_vars)
+            # l_clus = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.beta * model_utils.l_clus(rep_vars)
+            l_clus = self.beta * model_utils.l_clus(rep_vars)
 
         # Compute gradients
         pred_grad = tape.gradient(target=l_pred, sources=pred_vars)
@@ -272,11 +276,11 @@ class CAMELOT(tf.keras.Model):
         clus_grad = tape.gradient(target=l_clus, sources=rep_vars)
 
         # Apply gradients
-        self.optimizer.apply_gradients(zip(pred_grad, pred_vars))
-        self.optimizer.apply_gradients(zip(enc_id_grad, enc_id_vars))
+        # self.optimizer.apply_gradients(zip(pred_grad, pred_vars))
+        #self.optimizer.apply_gradients(zip(enc_id_grad, enc_id_vars))
         self.cluster_opt.apply_gradients(zip([clus_grad], [rep_vars]))
 
-        return l_pred, l_enc_id, l_clus
+        return {"L_pred": l_pred, "L_clus_id": l_enc_id, "L_clus_sep": l_clus}
         # return {'L1': L1.result(), 'L2': L2.result(), 'L3': L3.result()}
 
     def test_step(self, inputs):
@@ -300,7 +304,7 @@ class CAMELOT(tf.keras.Model):
         l_clus = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.beta * model_utils.l_clus(
             self.cluster_rep_set)
 
-        return l_pred, l_enc_id, l_clus
+        return {"L_pred": l_pred, "L_clus_id": l_enc_id, "L_clus_sep": l_clus}
         # return {'L1': val_L1.result(), 'L2': val_L2.result(), 'L3': val_L3.result()}
 
     # Initialisation procedure for the model
@@ -617,13 +621,6 @@ class CAMELOT(tf.keras.Model):
         return config
 
 
-DEFAULT_TRAIN_PARAMS = {
-    "lr": 0.001,
-    "epochs_init": 100,
-    "epochs": 100,
-    "bs": 32,
-    "cbck_str": "auc-sup-scores-cm"
-}
 
 
 class Model:
@@ -640,30 +637,31 @@ class Model:
         self.model = None
         self.run_num = 1
 
-    def fit(self, train_params=DEFAULT_TRAIN_PARAMS):
+    def fit(self, lr:float = 0.001, epochs_init: int = 100, epochs: int = 100, bs: int = 32,
+            cbck_str: str = "auc-sup-scores-cm"):
         """
         Fit method for training CAMELOT model.
 
         Params:
         - train_params: dictionary containing training parameter information:
-            - "lr": learning rate for training
-            - "epochs_init": number of epochs to train initialisation
-            - "epochs": number of epochs for main training
-            - "bs": batch size
-            - "cbck_str": callback_string indicating which callbacks to print during training
+            - "lr": learning rate for training (default = 0.001)
+            - "epochs_init": number of epochs to train initialisation (default = 100)
+            - "epochs": number of epochs for main training (default = 100)
+            - "bs": batch size (default = 32)
+            - "cbck_str": callback_string indicating callbacks to print during training (default: "auc-sup-scores-cm)
         """
-        self.train_params = train_params
+        self.train_params = {
+            "lr": lr,
+            "epochs_init": epochs_init,
+            "epochs": epochs,
+            "bs": bs,
+            "cbck_str": cbck_str
+        }
 
         # Unpack relevant data information
         X_train, X_val, X_test = self.data_info["X"]
         y_train, y_val, y_test = self.data_info["y"]
         output_dim = self.data_info["output_dim"]
-
-        # Unpack training parameters
-        lr = train_params["lr"]
-        epochs = train_params["epochs"]
-        bs = train_params["bs"]
-        callback_str = train_params["cbck_str"]
 
         # TODO- ADD GPU USAGE
 
@@ -676,20 +674,18 @@ class Model:
         self.model.compile(optimizer=optimizer, run_eagerly=True)
 
         # Train model on initialisation procedure
-        epochs_init = train_params["epochs_init"]
         print("-" * 20, "\n", "Initialising Model", sep="\n")
         self.model.initialise_model(data=(X_train, y_train), val_data=(X_val, y_val), epochs=epochs_init,
                                     learning_rate=lr, batch_size=bs)
 
         # Main Training phase
         print("-" * 20, "\n", "STARTING MAIN TRAINING PHASE")
-        callbacks, run_num = model_utils.get_callbacks(track_loss="L1", other_cbcks=callback_str, early_stop=True,
+        callbacks, run_num = model_utils.get_callbacks(track_loss="L1", other_cbcks=cbck_str, early_stop=True,
                                                        lr_scheduler=True,
                                                        tensorboard=True)
         self.run_num = run_num
-
-        self.model.fit(X_train, y_train, validation_data=(X_val, y_val), batch_size=bs, epochs=epochs, verbose=1,
-                       callbacks=callbacks)
+        self.model.fit(X_train, y_train, validation_data=(X_val, y_val), batch_size=bs, epochs=epochs,
+                       verbose=1)
 
     def evaluate(self, data_test):
         """
