@@ -6,7 +6,7 @@ File to define useful model block components. Includes other blocks that can be 
 import tensorflow as tf
 from tensorflow import linalg
 from tensorflow.keras.layers import Dense, Dropout, Layer, LSTM
-from tensorflow.keras.regularizers import l1_l2 as mix_l1_l2_reg
+from tensorflow.keras.regularizers import l1_l2 as l1_l2_reg
 
 
 # ------------ Utility Functions --------------
@@ -107,7 +107,7 @@ class MLP(Layer):
 
         # Regularization params
         self.dropout = dropout
-        self.regulariser = mix_l1_l2_reg(*regulariser_params)
+        self.regulariser = l1_l2_reg(*regulariser_params)
 
         # Seed
         self.seed = seed
@@ -355,7 +355,7 @@ class LSTMEncoder(Layer):
         self.dropout = dropout
         self.recurrent_dropout = recurrent_dropout
         self.regulariser_params = regulariser_params
-        self.regulariser = mix_l1_l2_reg(*regulariser_params)
+        self.regulariser = l1_l2_reg(*regulariser_params)
 
         # Add Intermediate Layers
         for layer_id_ in range(self.hidden_layers):
