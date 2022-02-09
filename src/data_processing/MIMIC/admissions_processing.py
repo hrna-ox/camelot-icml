@@ -19,8 +19,6 @@ Processing Steps:
 
 Other notes.
 ROW SUBSETTING COULD BE IMPROVED SOMEHOW
-
-DOUBLE CHECK ON ELECTIVE VS SURGICAL ADMISSIONS
 """
 
 # ------------------------------------ // --------------------------------------
@@ -41,7 +39,21 @@ if not os.path.exists(SAVE_FD):
 
 # ------------------------------------- // -------------------------------------
 if __name__ == "__main__":
-    "Load Tables"
+
+    """
+    First, Tables are Loaded. We load 4 tables:
+    
+    - patients_core: from core/patients filepath. This is a dataframe of patient centralised admission information. 
+    Cohort information for each patient is computed, as well as a unique id which is consistent across all other tables.
+    
+    - transfer_core: from core/transfers.csv filepath. This is a dataframe with a list of transfers for each patient.
+    Includes admissions to ED, but also transfers to wards in the hospital, ICUs, etc...
+    
+    - admissions_ed: from ed/edstays.csv filepath. This is a dataframe of patient information indicating relevant
+    information for any ED admission.
+    
+    - triage_ed: from ed/triage.csv filepath. This is a dataframe of patient ED admission 
+    """
 
     # Hospital Core
     patients_core = pd.read_csv(DATA_FD + "core/patients.csv", index_col=None, header=0, low_memory=False)
@@ -97,10 +109,10 @@ if __name__ == "__main__":
     admissions_ed_S4 = admissions_ed_S3[admissions_ed_S3["age"] >= AGE_LOWERBOUND]
     admissions_ed_S4.to_csv(SAVE_FD + "admissions_S4.csv", index=True, header=True)
 
-    # Compute and remove ESI NAN and save
+    # Compute and remove ESI NAN, ESI 1 and ESI 5 and save
     admissions_ed_S4["ESI"] = triage_ed.set_index("stay_id").loc[admissions_ed_S4.stay_id.values, "acuity"].values
     admissions_ed_S5 = admissions_ed_S4[~ admissions_ed_S4["ESI"].isna()]
-
+    admissions_ed_S5 = admissions_ed_S5[~ admissions_ed_S5["ESI"].isin([1,5])]
 
     # Save data
     admissions_ed_S5.to_csv(SAVE_FD + "admissions_intermediate.csv", index=True, header=True)
