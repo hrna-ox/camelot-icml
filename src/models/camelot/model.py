@@ -17,7 +17,7 @@ from tensorflow.keras import optimizers
 
 # Auxiliary
 import src.models.camelot.model_utils as model_utils
-from src.models.camelot.model_blocks import MLP, AttentionRNNEncoder
+from src.models.deep_learning.model_blocks import MLP, AttentionRNNEncoder
 
 
 def _class_weighting(y_true):
