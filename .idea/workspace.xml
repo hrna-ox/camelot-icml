@@ -2,13 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="e4ecba8e-2901-44aa-817c-245a30485212" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/src/visualisation/31-01-2022.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/visualisation/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/camelot/model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/camelot/model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/camelot/model_blocks.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/camelot/model_blocks.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/camelot/model_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/camelot/model_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/training/single_run.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/training/single_run.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -155,7 +149,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1643547888513</updated>
-      <workItem from="1643547890996" duration="43383000" />
+      <workItem from="1643547890996" duration="43667000" />
     </task>
     <servers />
   </component>
