@@ -23,16 +23,7 @@ HAVEN_DEFAULT_LOAD_CONFIG = {
     "seed": 2323
 }
 
-MIMIC_DEFAULT_LOAD_CONFIG = {
-    "data_name": "MIMIC",
-    "outcome_window": 12,
-    "feat_set": "vit-sta",
-    "time_range": (0, 100),
-    "include_time": False,
-    "train_test_ratio": 0.7,
-    "train_val_ratio": 0.6,
-    "seed": 2323
-}
+
 
 def data_loader(data_config):
     """Data Loader function."""
