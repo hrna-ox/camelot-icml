@@ -50,9 +50,9 @@ NEXT_TRANSFER_INFO = ["transfer_id", "eventtype", "careunit", "intime", "outtime
 if not os.path.exists(SAVE_FD):
     os.makedirs(SAVE_FD)
 
-# ------------------------------------- // -------------------------------------
-if __name__ == "__main__":
 
+# ------------------------------------- // -------------------------------------
+def main():
     """
     First, Tables are Loaded. We load 4 tables:
     

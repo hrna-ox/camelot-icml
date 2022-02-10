@@ -2,47 +2,12 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="e4ecba8e-2901-44aa-817c-245a30485212" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/src/data_processing/MIMIC/MIMIC_default_config.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/training/run_model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data_processing/MIMIC/run_processing.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/data_processing/MIMIC/admissions_processing.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_processing/MIMIC/admissions_processing.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data_processing/MIMIC/default_config.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data_processing/MIMIC/targets.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_processing/MIMIC/targets.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data_processing/MIMIC/targets.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_processing/MIMIC/outcomes_processing.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/data_processing/MIMIC/vitals_processing.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_processing/MIMIC/vitals_processing.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/AC-TPC/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/AC-TPC/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/AC-TPC/class_AC_TPC.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/AC-TPC/class_AC_TPC.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/AC-TPC/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/AC-TPC/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/AC-TPC/run-actpc.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/AC-TPC/run-actpc.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/AC-TPC/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/AC-TPC/utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/AC-TPC/utils_log.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/AC-TPC/utils_log.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/AC-TPC/utils_network.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/AC-TPC/utils_network.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/ATTEP/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/ATTEP/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/ATTEP/model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/ATTEP/model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/ATTEP/model_blocks.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/ATTEP/model_blocks.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/ATTEP/model_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/ATTEP/model_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/ATTEP/run_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/ATTEP/run_model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/ENC_PRED/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/ENC_PRED/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/ENC_PRED/model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/ENC_PRED/model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/ENC_PRED/model_blocks.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/ENC_PRED/model_blocks.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/ENC_PRED/model_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/ENC_PRED/model_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/ENC_PRED/run_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/ENC_PRED/run_model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/SOM-VAE/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/SOM-VAE/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/SOM-VAE/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/SOM-VAE/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/SOM-VAE/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/SOM-VAE/requirements.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/SOM-VAE/somvae_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/SOM-VAE/somvae_model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/SOM-VAE/somvae_train.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/SOM-VAE/somvae_train.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/SOM-VAE/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/SOM-VAE/utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/SOM-VAE/utils_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/SOM-VAE/utils_model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/camelot/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/camelot/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/camelot/model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/camelot/model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/camelot/model_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/camelot/model_utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/training/data_loader.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/training/data_loader.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/training/data_loading_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/training/data_loading_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/training/main.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/training/model_class.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/training/single_run.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/training/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/training/utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -146,7 +111,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/data_processing/MIMIC/targets.py" />
+      <option name="SCRIPT_NAME" value="C:\Users\hruia\PycharmProjects\camelot-icml\src\data_processing\MIMIC\outcomes_processing.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -194,7 +159,7 @@
       <updated>1643547888513</updated>
       <workItem from="1643547890996" duration="43667000" />
       <workItem from="1644420862423" duration="2245000" />
-      <workItem from="1644488874682" duration="18863000" />
+      <workItem from="1644488874682" duration="19788000" />
     </task>
     <servers />
   </component>
