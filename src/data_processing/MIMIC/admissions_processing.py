@@ -22,7 +22,20 @@ ROW SUBSETTING COULD BE IMPROVED SOMEHOW
 """
 
 # ------------------------------------ // --------------------------------------
-"General Variables for Processing"
+"""
+List of variables used for processing which should be fixed.
+
+Data_FD: where the data is saved.
+SAVE_FD: folder path of interim data saving.
+ID_COLUMNS: identifiers for admissions, patients and hospital stays.
+TIME_COLUMNS: list of datetime object columns.
+WARDS_TO_REMOVE: list of special wards where patients were transferred to and which represent unique populations. This
+list includes Partum and Psychiatry wards, as well as further ED observations, which generally take place when 
+the hospital is full.
+AGE_LOWERBOUND: minimum age of patients.
+PATIENT_INFO: characteristic information for each patient.
+NEXT_TRANSFER_INFO: list of important info to keep related to the subsequent transfer from ED.
+"""
 DATA_FD = "data/MIMIC/"
 SAVE_FD = DATA_FD + "interim/"
 ID_COLUMNS = ["subject_id", "hadm_id", "stay_id"]
@@ -52,7 +65,7 @@ if __name__ == "__main__":
     - admissions_ed: from ed/edstays.csv filepath. This is a dataframe of patient information indicating relevant
     information for any ED admission.
     
-    - triage_ed: from ed/triage.csv filepath. This is a dataframe of patient ED admission 
+    - triage_ed: from ed/triage.csv filepath. This is a dataframe of patient ED admission indicating triage assessments.
     """
 
     # Hospital Core
@@ -66,7 +79,13 @@ if __name__ == "__main__":
     triage_ed = pd.read_csv(DATA_FD + "ed/triage.csv", index_col=None, header=0, low_memory=False)
 
     # ------------------------------------- // -------------------------------------
-    "Process Admission Data"
+    """
+    Process Admission data according to multiple steps.
+    
+    Step 1: Remove double admission counts. Select the latest intime. If there are multiple such intimes, 
+    select the last outtime.
+    Consider only these admissions.
+    """
 
     # Compute recorded admission intimes and outtimes. Respectively, select latest intime and outtime.
     admissions_intime_ed = utils.endpoint_target_ids(admissions_ed, "subject_id", "intime")
@@ -76,6 +95,11 @@ if __name__ == "__main__":
                                           ["stay_id"])  # last admission information
     admissions_ed_S1.to_csv(SAVE_FD + "admissions_S1.csv", index=True, header=True)
 
+    """
+    Identify those admissions where patients were directly sent to Emergency Department, i.e., the first intime
+    is in the Emergency Department. 
+    Subset to these admissions.
+    """
     # Identify first wards for all admissions to hospital
     transfers_first_ward = utils.endpoint_target_ids(transfers_core, "subject_id", "intime", mode="min")
     ed_first_transfer = transfers_first_ward[(transfers_first_ward["eventtype"] == "ED") &
@@ -87,6 +111,10 @@ if __name__ == "__main__":
     transfers_ed_S2 = utils.subsetted_by(transfers_core, admissions_ed_S2, ["subject_id", "hadm_id"])
     admissions_ed_S2.to_csv(SAVE_FD + "admissions_S2.csv", index=True, header=True)
 
+    """
+    Consider only those admissions for which they did not have a subsequent transfer to a Special ward, which includes
+    Partum and Psychiatry wards. The full list of wards is identified in WARDS TO REMOVE
+    """
     # Remove admissions transferred to irrelevant wards (Partum, Psychiatry). Furthermore, EDObs is also special.
     # Missing check that second intime is after ED outtime
     transfers_second_ward = utils.compute_second_transfer(transfers_ed_S2, "subject_id", "intime",
@@ -101,18 +129,27 @@ if __name__ == "__main__":
     for col in NEXT_TRANSFER_INFO:
         admissions_ed_S3.loc[:, "next_" + col] = transfers_to_relevant_wards.set_index("subject_id").loc[
             patients_S3, col].values
-    admissions_ed_S3.to_csv(SAVE_FD + "admissions_S3.csv", index=True, header=True)
 
-    # Compute age and Remove below AGE LOWERBOUND
+    # Compute age and save
     admissions_ed_S3["age"] = admissions_ed_S3.intime.dt.year - admissions_ed_S3["anchor_year"] + admissions_ed_S3[
         "anchor_age"]
+    admissions_ed_S3.to_csv(SAVE_FD + "admissions_S3.csv", index=True, header=True)
+
+    """
+    Step 4: Patients must have an age older than AGE LOWERBOUND
+    """
+    # Compute age and Remove below AGE LOWERBOUND
     admissions_ed_S4 = admissions_ed_S3[admissions_ed_S3["age"] >= AGE_LOWERBOUND]
     admissions_ed_S4.to_csv(SAVE_FD + "admissions_S4.csv", index=True, header=True)
 
+    """
+    Step 5: Add ESI information, and subset to patients with ESI values and between 2, 3, 4.
+    ESI values of 1 and 5 are edge cases (nothing wrong with them, or in extremely critical condition).
+    """
     # Compute and remove ESI NAN, ESI 1 and ESI 5 and save
     admissions_ed_S4["ESI"] = triage_ed.set_index("stay_id").loc[admissions_ed_S4.stay_id.values, "acuity"].values
     admissions_ed_S5 = admissions_ed_S4[~ admissions_ed_S4["ESI"].isna()]
-    admissions_ed_S5 = admissions_ed_S5[~ admissions_ed_S5["ESI"].isin([1,5])]
+    admissions_ed_S5 = admissions_ed_S5[~ admissions_ed_S5["ESI"].isin([1, 5])]
 
     # Save data
     admissions_ed_S5.to_csv(SAVE_FD + "admissions_intermediate.csv", index=True, header=True)

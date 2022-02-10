@@ -2,18 +2,16 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import tensorflow as tf
-import scipy
 
 import random
-import os, sys
+import os
 import argparse
 
-from tensorflow.python.ops.rnn import _transpose_batch_time
 from sklearn.model_selection import train_test_split
 
 #performance metrics
 from sklearn.metrics import roc_auc_score, average_precision_score
-from sklearn.metrics import normalized_mutual_info_score, homogeneity_score, adjusted_rand_score
+from sklearn.metrics import normalized_mutual_info_score, adjusted_rand_score
 from sklearn.metrics.cluster import contingency_matrix
 
 #user defined

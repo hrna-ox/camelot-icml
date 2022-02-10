@@ -4,53 +4,60 @@
 Load data into configuration dictionary for use on later end models.
 """
 
-import argparse
+from typing import Union, List, Tuple
 import src.training.data_loading_utils as data_utils
 
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-# %%  Load configuration for data loader 
 
-HAVEN_DEFAULT_LOAD_CONFIG = {
-    "data_name": "HAVEN",
-    "outcome_window": 0,
-    "feat_set": "vit-lab-sta",
-    "time_range": (24, 72),
-    "include_time": False,
-    "train_test_ratio": 0.4,
-    "train_val_ratio": 0.6,
-    "seed": 2323
-}
+# %%  Load configuration for data loader
 
+def data_loader(data_name: str = "MIMIC", feat_set: Union[List, str] = "vit", time_range: Tuple = (0, 6),
+                target_window: int = 4, train_test_ratio: float = 0.6, train_val_ratio: float = 0.5, seed: int = 2323):
+    """
+    Data Loader function. Given data configuration, convert into input format.
 
+    Params:
+    - data_name: Which dataset to load. One of ["MIMIC", "COMPUTE", "HAVEN", "SAMPLE"]
+    - feat_set: Indicates feature sets to load. If type list, then a list of the features to load. If
+    of type string, then considers sets of variables. For instance, "vit" refers to vital signs, and loads
+    Heart-Rate, Respiratory-Rate, SPO2, Temperature, etc...
+    - time_range: tuple, time_window considered for time to discharge. This considers only a temporal subset of the
+    available observations.
+    - target_window: int, window interval on which to identify outcomes. Relevant only for MIMIC data.
+    - train_test_ratio: float, ratio between training+val data and test data.
+    - train_val_ratio: float, ratio between training data and validation data.
+    - seed: int, seed for random generation.
+    """
 
-def data_loader(data_config):
-    """Data Loader function."""
+    # Load Data Processor Object
+    data_processor = data_utils.DataProcessor(data_name=data_name, feat_set=feat_set, time_range=time_range,
+                                              target_window=target_window)
 
-    data_processor = data_utils.DataProcessor(**data_config)
-    x, y, mask, ids, feats, outcomes, X_og, y_og = data_processor.load_transform()
-    print(f"{data_config['data_name']} data successfully loaded.")
+    # Convert to input format, and keep track of useful information
+    x, y, mask, ids, feats, outcomes, X_feat, y_outc = data_processor.load_transform()
+    print(f"{data_name} data successfully loaded.")
 
     # Separate into train, val and test data
     X_train, X_test, y_train, y_test, id_train, id_test, mask_train, mask_test = train_test_split(
-        x, y, ids, mask,
-        train_size=data_config["train_test_ratio"], random_state=data_config["seed"],
-        shuffle=True, stratify=np.argmax(y, axis=-1))
+        x, y, ids, mask, train_size=train_test_ratio, random_state=seed, shuffle=True, stratify=np.argmax(y, axis=-1))
 
     X_train, X_val, y_train, y_val, id_train, id_val, mask_train, mask_val = train_test_split(
-        X_train, y_train, id_train, mask_train,
-        train_size=data_config["train_val_ratio"], random_state=data_config["seed"],
-        shuffle=True, stratify=np.argmax(y_train, axis=-1))
-    # Normalise and do the same for Validation and Test sets.
+        X_train, y_train, id_train, mask_train, train_size=train_val_ratio, random_state=seed, shuffle=True,
+        stratify=np.argmax(y_train, axis=-1))
+
+    "Normalise Data, and apply normalisation factors to validation and test."
     X_train = data_processor.normalise(X_train)
     X_val = data_processor.apply_normalisation(X_val)
     X_test = data_processor.apply_normalisation(X_test)
 
+    # Get min and max factors.
     min_, max_ = data_processor.min, data_processor.max
 
-    # Separate into train and validation test
-    output_dim = y_train.shape[-1]
+    # Get data_config
+    data_config = {"data_name": data_name, "feat_set": feat_set, "time_range (h)": time_range, "window": 4,
+                   "train-test-ratio": train_test_ratio, "train-val-ratio": train_val_ratio, "seed": seed}
 
     # Aggregate into output
     output = {"X": (X_train, X_val, X_test),
@@ -60,7 +67,7 @@ def data_loader(data_config):
               "feats": feats,
               "norm_min": min_,
               "norm_max": max_,
-              "output_dim": output_dim,
+              "outcomes": outcomes,
               "data_load_config": data_config
               }
 

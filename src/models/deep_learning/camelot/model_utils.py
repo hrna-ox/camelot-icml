@@ -405,7 +405,7 @@ class UnsupervisedTargetMetrics(cbck.Callback):
                         SIL {sil:.2f}, {sil_l:.2f}""")
 
 
-def cbck_list(summary_name: str, interval: int = 5):
+def cbck_list(summary_name: str, interval: int = 5, validation_data: tuple = ()):
     """
     Shorthand for callbacks above.
 
@@ -416,33 +416,33 @@ def cbck_list(summary_name: str, interval: int = 5):
     extra_callback_list = []
 
     if "auc" in summary_name.lower() or "roc" in summary_name.lower():
-        extra_callback_list.append(AUROC(interval=interval))
+        extra_callback_list.append(AUROC(interval=interval, validation_data=validation_data))
 
     if "clus_sep" in summary_name.lower() or "clus_phen" in summary_name.lower():
-        extra_callback_list.append(CEClusSeparation(interval=interval))
+        extra_callback_list.append(CEClusSeparation(interval=interval, validation_data=validation_data))
 
     if "cm" in summary_name.lower() or "conf_matrix" in summary_name.lower():
-        extra_callback_list.append(ConfusionMatrix(interval=interval))
+        extra_callback_list.append(ConfusionMatrix(interval=interval, validation_data=validation_data))
 
     if "clus_info" in summary_name.lower():
-        extra_callback_list.append(PrintClusterInfo(interval=interval))
+        extra_callback_list.append(PrintClusterInfo(interval=interval, validation_data=validation_data))
 
     if "sup_scores" in summary_name.lower():
-        extra_callback_list.append(SupervisedTargetMetrics(interval=interval))
+        extra_callback_list.append(SupervisedTargetMetrics(interval=interval, validation_data=validation_data))
 
     if "unsup_scores" in summary_name.lower():
-        extra_callback_list.append(UnsupervisedTargetMetrics)
+        extra_callback_list.append(UnsupervisedTargetMetrics(interval=interval, validation_data=validation_data))
 
     return list(extra_callback_list)
 
 
-def get_callbacks(track_loss: str, interval: int = 5, other_cbcks: str = "", early_stop: bool = True, lr_scheduler: bool = True,
-                  tensorboard: bool = True,
-                  min_delta: float = 0.0001, patience: int = 100):
+def get_callbacks(validation_data, track_loss: str, interval: int = 5, other_cbcks: str = "", early_stop: bool = True, lr_scheduler: bool = True,
+                  tensorboard: bool = True, min_delta: float = 0.0001, patience: int = 100):
     """
     Generate complete list of callbacks given input configuration.
 
     Params:
+        - validation_data: tuple (X, y) of validation data.
         - track_loss: str, name of main loss to keep track of.
         - interval: int, interval to print information on.
         - other_cbcks: str, list of other callbacks to consider (default = "", which selects None).
@@ -474,7 +474,7 @@ def get_callbacks(track_loss: str, interval: int = 5, other_cbcks: str = "", ear
     # ------------------ Start Loading callbacks ---------------------------
 
     # Load custom callbacks first
-    callbacks.extend(cbck_list(other_cbcks, interval))
+    callbacks.extend(cbck_list(other_cbcks, interval, validation_data=validation_data))
 
     # Model Weight saving callback
     checkpoint = cbck.ModelCheckpoint(filepath=save_fd + "models/checkpoints/epoch-{epoch}", save_best_only=True,

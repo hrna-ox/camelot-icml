@@ -136,6 +136,38 @@ def _median_fill(array):
     return array_out
 
 
+def _load(data_folder, window=4):
+    """Load Trajectory, Target data jointly given data folder."""
+
+    # Check Processed data folder exists
+    try:
+        assert os.path.exists(data_folder)
+    except AssertionError:
+        print(f"Folder does not Exist. Check data has been processed. Input to the load function is {data_folder}.")
+
+    if "HAVEN" in data_folder:
+        X = pd.read_csv(data_folder + "COPD_VLS_process.csv", parse_dates=HAVEN_PARSE_TIME_VARS, header=0)
+        y = pd.read_csv(data_folder + "copd_outcomes.csv", index_col=0)
+
+    elif "MIMIC" in data_folder:
+
+        # Load observation and static variables. Convert timedelta columns
+        X = pd.read_csv(data_folder + "vitals_process.csv", parse_dates=MIMIC_PARSE_TIME_VARS, header=0, index_col=0)
+        X = convert_to_timedelta(X, *MIMIC_PARSE_TD_VARS)
+
+        # Load outcomes based on target window
+        y = pd.read_csv(data_folder + f"outcomes_{window}h_process.csv", index_col=0)
+
+    elif "SAMPLE" in data_folder:
+        X = None
+        y = None
+
+    else:
+        raise ValueError(f"Data Name does not match available datasets. Input Folder provided {data_folder}")
+
+    return X, y
+
+
 def impute(X):
     """
     Imputation of 3D array accordingly with time as dimension 1:
@@ -154,33 +186,6 @@ def impute(X):
 
     return impute_step3, mask
 
-
-def load(data_folder, window=4):
-    """Load Trajectory, Target data jointly given data folder."""
-
-    # Check Processed data folder exists
-    try:
-        assert os.path.exists(data_folder)
-    except AssertionError:
-        print(f"Folder does not Exist. Check data has been processed. Input to the load function is {data_folder}.")
-
-    if "HAVEN" in data_folder:
-        X = pd.read_csv(data_folder + "COPD_VLS_process.csv", parse_dates=HAVEN_PARSE_TIME_VARS, header=0)
-        y = pd.read_csv(data_folder + "copd_outcomes.csv", index_col=0)
-
-    elif "MIMIC" in data_folder:
-        X = pd.read_csv(data_folder + "vitals_process.csv", parse_dates=MIMIC_PARSE_TIME_VARS, header=0, index_col=0)
-        X = convert_to_timedelta(X, *MIMIC_PARSE_TD_VARS)
-        y = pd.read_csv(data_folder + f"outcomes_{window}h_process.csv", index_col=0)
-
-    elif "SAMPLE" in data_folder:
-        X = None
-        y = None
-
-    else:
-        raise ValueError(f"Data Name does not match available datasets. Input Folder provided {data_folder}")
-
-    return X, y
 
 def get_ids(data_folder):
     """Get input id information."""
@@ -283,17 +288,16 @@ class DataProcessor:
         - include_time: bool, indicates whether to add time difference between consecutive observations as a variable.
     """
 
-    def __init__(self, data_name="HAVEN", feat_set='vitals',
-                 time_range=(24, 72), outcome_window=4, include_time=False, **kwargs):
+    def __init__(self, data_name="HAVEN", target_window=4, feat_set='vitals',
+                 time_range=(24, 72)):
 
         # Dataset selection and feature subset
         self.dataset_name = data_name
-        self.outcome_window = outcome_window
+        self.target_window = target_window
         self.feat_set = feat_set
 
-        # Subset observations between time range and decide whether to include time as another feature.
+        # Subset observations between time range
         self.time_range = time_range
-        self.include_time = include_time
 
         # Ids depending on data
         self.id_col = None
@@ -313,8 +317,12 @@ class DataProcessor:
 
     def load(self):
         """Load Dataset according to given parameters."""
+
+        # Load data
         data_folder = f"data/{self.dataset_name}/processed/"
-        data = load(data_folder, window=self.outcome_window)
+        data = _load(data_folder, window=self.target_window)
+
+        # Get data info
         self.id_col, self.time_col, self.needs_time_to_end_computation = get_ids(data_folder)
 
         return data
@@ -345,22 +353,22 @@ class DataProcessor:
         # Do things to y
         outcomes = _get_outcome_names(self.dataset_name)
         y_data = y[outcomes]
-        y_out = y_data.to_numpy()
+        y_out = y_data.to_numpy().astype("float32")
 
         # Check data loaded correctly
         _check_input_format(x_out, y_out)
 
-        return x_out.astype("float32"), y_out.astype(
-            "float32"), mask, pat_time_ids, features, outcomes, x_subset, y_data
+        return x_out, y_out, mask, pat_time_ids, features, outcomes, x_subset, y_data
 
     def _add_time_to_end(self, X):
-        """Add new column to dataframe - this computes time to end of grouped observations."""
+        """Add new column to dataframe - this computes time to end of grouped observations, if needed."""
         x_inter = X.copy(deep=True)
 
-        if self.needs_time_to_end_computation:
+        # if time to end has not been computed
+        if self.needs_time_to_end_computation is True:
+
             # Compute datetime values for time until end of group of observations
-            times = X.groupby(self.id_col).apply(lambda x:
-                                                 x.loc[:, self.time_col].max() - x.loc[:, self.time_col])
+            times = X.groupby(self.id_col).apply(lambda x: x.loc[:, self.time_col].max() - x.loc[:, self.time_col])
 
             # add column to dataframe after converting to hourly times.
             x_inter["time_to_end"] = convert_datetime_to_hour(times).values
@@ -369,7 +377,10 @@ class DataProcessor:
             x_inter["time_to_end"] = x_inter[self.time_col].values
             x_inter["time_to_end"] = convert_datetime_to_hour(x_inter.loc[:, "time_to_end"])
 
-        return x_inter.sort_values(by=[self.id_col, "time_to_end"], ascending=[True, False])
+        # Sort data
+        x_out = x_inter.sort_values(by = [self.id_col, "time_to_end"], ascending=[True, False])
+
+        return x_out
 
     def _truncate(self, X):
         """Truncate dataset on time to end column according to self.time_range."""
@@ -407,12 +418,8 @@ class DataProcessor:
         num_ids = X[self.id_col].nunique()
 
         # Other basic definitions
-        feats = [col for col in X.columns if col not in [self.id_col, self.time_col, "time_to_end"]]
+        feats = [col for col in X.columns if col not in [self.id_col, "time_to_end"]]
         list_ids = X[self.id_col].unique()
-
-        # Add include time as a column if specified.
-        if self.include_time:
-            feats = feats + ["time_to_end"]
 
         # Initialise output array and id-time array
         out_array = np.empty(shape=(num_ids, max_time_length, len(feats)))
@@ -426,6 +433,7 @@ class DataProcessor:
 
         # Iterate through ids
         for id_ in tqdm(list_ids):
+
             # Subset data to where matches respective id
             index_ = np.where(list_ids == id_)[0]
             x_id = X[X[self.id_col] == id_]

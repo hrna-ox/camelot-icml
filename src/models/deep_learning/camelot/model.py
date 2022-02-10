@@ -7,19 +7,18 @@ Date Last updated: 24 Jan 2022
 Author: Henrique Aguiar
 Please contact via henrique.aguiar@eng.ox.ac.uk
 """
-import json
-
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from sklearn.cluster import KMeans
 from tensorflow.keras import optimizers
+from sklearn.cluster import KMeans
 
-# Auxiliary
-import src.models.camelot.model_utils as model_utils
+import json
+import src.models.deep_learning.camelot.model_utils as model_utils
 from src.models.deep_learning.model_blocks import MLP, AttentionRNNEncoder
 
 
+# Auxiliary Functions
 def _class_weighting(y_true):
     """
     Function to compute inverse class proportion weighting given array of true class assignments.
@@ -267,8 +266,7 @@ class CAMELOT(tf.keras.Model):
             # compute losses
             l_pred = model_utils.l_pred(y, y_pred, weights=self.loss_weights)
             l_enc_id = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.alpha * model_utils.l_dist(pi)
-            # l_clus = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.beta * model_utils.l_clus(rep_vars)
-            l_clus = self.beta * model_utils.l_clus(rep_vars)
+            l_clus = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.beta * model_utils.l_clus(rep_vars)
 
         # Compute gradients
         pred_grad = tape.gradient(target=l_pred, sources=pred_vars)
@@ -276,8 +274,8 @@ class CAMELOT(tf.keras.Model):
         clus_grad = tape.gradient(target=l_clus, sources=rep_vars)
 
         # Apply gradients
-        # self.optimizer.apply_gradients(zip(pred_grad, pred_vars))
-        #self.optimizer.apply_gradients(zip(enc_id_grad, enc_id_vars))
+        self.optimizer.apply_gradients(zip(pred_grad, pred_vars))
+        self.optimizer.apply_gradients(zip(enc_id_grad, enc_id_vars))
         self.cluster_opt.apply_gradients(zip([clus_grad], [rep_vars]))
 
         return {"L_pred": l_pred, "L_clus_id": l_enc_id, "L_clus_sep": l_clus}
@@ -307,7 +305,7 @@ class CAMELOT(tf.keras.Model):
         return {"L_pred": l_pred, "L_clus_id": l_enc_id, "L_clus_sep": l_clus}
         # return {'L1': val_L1.result(), 'L2': val_L2.result(), 'L3': val_L3.result()}
 
-    # Initialisation procedure for the model
+    # Initialisation Methods for Model Training
     def initialise_model(self, data: tuple, val_data: tuple, epochs: int = 100, learning_rate: float = 0.001,
                          batch_size: int = 64, **kwargs):
         """
@@ -528,8 +526,7 @@ class CAMELOT(tf.keras.Model):
             if self.iden_loss_tracker.iloc[-50:, -1].le(loss_val + 0.001).any():
                 break
 
-    # USEFUL METHODS
-
+    # Useful Methods to compute attributes and model properties.
     def compute_unnorm_attention_weights(self, inputs):
         """
         Computes unnormalised attention weights alpha, beta, gamma.
@@ -621,36 +618,44 @@ class CAMELOT(tf.keras.Model):
         return config
 
 
-
-
-class Model:
+class Model(CAMELOT):
     """
-    Class for fitting and evaluating Camelot architecture model.
+    Model Class Wrapper for CAMELOT with fit and evaluate methods.
     """
 
-    def __init__(self, data_info, model_config):
-        """Initialise model configuration parameters."""
-        self.data_info = data_info
-        self.model_config = model_config
-        self.model_name = "camelot"
-        self.train_params = None
-        self.model = None
+    def __init__(self, output_dim: int = 4, **kwargs):
+        """
+        Initialise object with model configuration.
+
+        Params:
+        - output_dim: dimensionality of output space (default=4).
+        - kwargs: other model configuration parameters
+        """
+
+        # Useful information
+        self.model_config = {"output_dim": output_dim, **kwargs}
         self.run_num = 1
+        self.model_name = "camelot"
 
-    def fit(self, lr:float = 0.001, epochs_init: int = 100, epochs: int = 100, bs: int = 32,
-            cbck_str: str = "auc-sup-scores-cm"):
+        # Initialise training parameters
+        self.training_params = None
+
+        super().__init__(output_dim=output_dim, **kwargs)
+
+    def train(self, data_info, lr: float = 0.001, epochs_init: int = 100, epochs: int = 100, bs: int = 32,
+            cbck_str: str = "auc-sup-scores-cm", **kwargs):
         """
         Fit method for training CAMELOT model.
 
         Params:
-        - train_params: dictionary containing training parameter information:
-            - "lr": learning rate for training (default = 0.001)
-            - "epochs_init": number of epochs to train initialisation (default = 100)
-            - "epochs": number of epochs for main training (default = 100)
-            - "bs": batch size (default = 32)
-            - "cbck_str": callback_string indicating callbacks to print during training (default: "auc-sup-scores-cm)
+        - data_info: dictionary with data information and parameters.
+        - "lr": learning rate for training (default = 0.001)
+        - "epochs_init": number of epochs to train initialisation (default = 100)
+        - "epochs": number of epochs for main training (default = 100)
+        - "bs": batch size (default = 32)
+        - "cbck_str": callback_string indicating callbacks to print during training (default: "auc-sup-scores-cm)
         """
-        self.train_params = {
+        self.training_params = {
             "lr": lr,
             "epochs_init": epochs_init,
             "epochs": epochs,
@@ -659,90 +664,94 @@ class Model:
         }
 
         # Unpack relevant data information
-        X_train, X_val, X_test = self.data_info["X"]
-        y_train, y_val, y_test = self.data_info["y"]
-        output_dim = self.data_info["output_dim"]
+        X_train, X_val, X_test = data_info["X"]
+        y_train, y_val, y_test = data_info["y"]
 
         # TODO- ADD GPU USAGE
 
         # Initialise model
-        self.model = CAMELOT(output_dim=output_dim, **self.model_config)
-        self.model.build(X_train.shape)
+        self.build(X_train.shape)
 
         # Load optimizer
         optimizer = optimizers.Adam(learning_rate=lr)
-        self.model.compile(optimizer=optimizer, run_eagerly=True)
+        self.compile(optimizer=optimizer, run_eagerly=True)
 
         # Train model on initialisation procedure
         print("-" * 20, "\n", "Initialising Model", sep="\n")
-        self.model.initialise_model(data=(X_train, y_train), val_data=(X_val, y_val), epochs=epochs_init,
-                                    learning_rate=lr, batch_size=bs)
+        self.initialise_model(data=(X_train, y_train), val_data=(X_val, y_val), epochs=epochs_init,
+                              learning_rate=lr, batch_size=bs)
 
         # Main Training phase
         print("-" * 20, "\n", "STARTING MAIN TRAINING PHASE")
-        callbacks, run_num = model_utils.get_callbacks(track_loss="L1", other_cbcks=cbck_str, early_stop=True,
-                                                       lr_scheduler=True,
-                                                       tensorboard=True)
+        callbacks, run_num = model_utils.get_callbacks((X_val, y_val), track_loss="L1", other_cbcks=cbck_str,
+                                                       early_stop=True, lr_scheduler=True, tensorboard=True)
         self.run_num = run_num
-        self.model.fit(X_train, y_train, validation_data=(X_val, y_val), batch_size=bs, epochs=epochs,
-                       verbose=1)
+        self.fit(X_train, y_train, validation_data=(X_val, y_val), batch_size=bs, epochs=epochs,
+                 verbose=1, callbacks=callbacks, **kwargs)
 
-    def evaluate(self, data_test):
+    def evaluate(self, data_info):
         """
         Evaluation method for computing output results.
 
         Params:
-        - data_test: tuple of array-like test data:
-            - X_test: of shape (?, T, D_f)
-            - y_test: of shape (?, num_outcs)
+        - data_info: dictionary with data information.
 
         Returns:
+            - y_pred: dataframe of shape (N, output_dim) with outcome probability prediction.
+            - outc_pred: Series of shape (N, ) with predicted outcome based on most likely outcome prediction.
+            - y_true: dataframe of shape (N, output_dim) ith one-hot encoded true outcome.
+            - pis_pred: dataframe of shape (N, K) of cluster probability assignment.
+            - clus_pred: Series of shape (N, ) with cluster assignment based on most likely cluster probability.
+            - clus_representations: Numpy array of shape (K, latent_dim) with corresponding luster representation vectors.
+            - clus_phenotypes: DataFrame of shape (K, output_dim) with predicted cluster outcome probability.
 
+        Saves a variety of model information, as well.
         """
 
         # Unpack test data
-        X_test, y_test = data_test
+        _, _, X_test = data_info["X"]
+        _, _, y_test = data_info["y"]
 
         # Source outcome names and patient id info
-        id_info = self.data_info["ids"][-1]
+        id_info = data_info["ids"][-1]
         pat_ids = id_info[:, 0, 0]
-        outc_dims = self.data_info["outc_dims"]
+        outc_dims = self.output_dim
         save_fd = f"results/{self.model_name}/{self.run_num}/"
         track_fd = f"experiments/{self.model_name}/{self.run_num}/"
 
         # Other useful defs
-        K = self.model.K
+        K = self.K
         cluster_names = list(range(1, K + 1))
 
         # Firstly, compute predicted y estimates
-        y_pred = pd.DataFrame(self.model.predict(X_test).numpy(), index=pat_ids, columns=outc_dims)
+        y_pred = pd.DataFrame(self.predict(X_test).numpy(), index=pat_ids, columns=outc_dims)
         outc_pred = pd.Series(np.argmax(y_pred, axis=-1), index=pat_ids)
         y_true = pd.DataFrame(y_test, index=pat_ids, columns=outc_dims)
 
         # Secondly, compute predicted cluster assignments
-        pis_pred = pd.DataFrame(self.model.compute_pis(X_test).numpy(), index=pat_ids, columns=cluster_names)
-        clus_pred = pd.Series(self.model.clus_assign(X_test).numpy(), index=pat_ids)
+        pis_pred = pd.DataFrame(self.compute_pis(X_test), index=pat_ids, columns=cluster_names)
+        clus_pred = pd.Series(self.clus_assign(X_test), index=pat_ids)
 
         # Thirdly, compute cluster phenotype information
-        clus_phenotypes = pd.DataFrame(self.model.compute_cluster_phenotypes(), index=cluster_names, columns=outc_dims)
-        cluster_rep_set = self.model.get_cluster_reps()
+        clus_phenotypes = pd.DataFrame(self.compute_cluster_phenotypes(), index=cluster_names, columns=outc_dims)
+        cluster_rep_set = self.get_cluster_reps()
 
         # Fourth, save model init losses
-        init_loss_1 = self.model.enc_pred_loss_tracker
-        init_loss_2 = self.model.iden_loss_tracker
+        init_loss_1 = self.enc_pred_loss_tracker
+        init_loss_2 = self.iden_loss_tracker
         init_loss_1.index.name, init_loss_2.index.name = "epoch", "epoch"
 
         # Fifth, compute attention scores
-        alpha, beta, gamma = self.model.compute_unnorm_attention_weights(X_test)
-        alpha_norm, beta_norm, gamma_norm = self.model.compute_norm_attention_weights(X_test)
+        alpha, beta, gamma = self.compute_unnorm_attention_weights(X_test)
+        alpha_norm, beta_norm, gamma_norm = self.compute_norm_attention_weights(X_test)
 
         # Finally, compute scores
         auc, nmi, ars, purity = model_utils.supervised_scores(y_true, y_pred)
-        dbs, chs, sil = model_utils.unsupervised_scores(X_test.reshape(X_test.shape[0], -1), y_pred, self.model.seed)
+        dbs, chs, sil = model_utils.unsupervised_scores(X_test.reshape(X_test.shape[0], -1), y_pred, self.seed)
 
         # Compute unsupervised metrics on latent
-        projs = self.model.Encoder(X_test).numpy()
-        dbs_lat, chs_lat, sil_lat = model_utils.unsupervised_scores(projs, y_pred, self.model.seed)
+        projs = self.Encoder(X_test).numpy()
+        dbs_lat, chs_lat, sil_lat = model_utils.unsupervised_scores(projs, y_pred, self.seed)
 
         # Combine into a single pandas Series
         output_scores = pd.Series([auc, nmi, ars, purity, dbs, dbs_lat, chs, chs_lat, sil, sil_lat],
@@ -773,11 +782,20 @@ class Model:
         np.savez(save_fd + "norm_weights.npy", alpha=alpha_norm, beta=beta_norm, gamma=gamma_norm)
 
         # save model parameters
-        params = {**self.data_info, **self.model_config, **self.train_params}
-        with open(save_fd + "config", "w+") as f:
-            json.dump(vars(params), f)
+        save_params = {**data_info["data_load_config"], **self.model_config, **self.train_params}
+        with open(save_fd + "config", "w") as f:
+            json.dump(save_params, f)
             f.close()
 
-        with open(track_fd + "config", "w+") as f:
-            json.dump(vars(params), f)
+        with open(track_fd + "config", "w") as f:
+            json.dump(save_params, f)
             f.close()
+
+        # Return objects
+        output_results = {
+            "y_pred": y_pred, "class_pred": outc_pred, "y_true": y_true, "pis_pred": pis_pred, "clus_pred": clus_pred,
+            "clus_representations": cluster_rep_set, "clus_phenotypes": clus_phenotypes, "scores": output_scores,
+            "init_loss_1": init_loss_1, "init_loss_2": init_loss_2
+        }
+
+        return output_results

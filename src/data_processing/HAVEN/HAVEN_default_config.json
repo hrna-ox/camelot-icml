@@ -1,0 +1,1 @@
+{"data_name": "HAVEN", "outcome_window": 0, "feat_set": "vit-lab-sta", "time_range": [24, 72], "train_test_ratio": 0.4, "train_val_ratio": 0.6, "seed": 2323}

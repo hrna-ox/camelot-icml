@@ -1,0 +1,7 @@
+{
+   "lr": 0.001,
+   "epochs_init": 10,
+   "epochs": 10,
+   "bs": 32,
+   "cbck_str": "auc-sup-scores-cm"
+}

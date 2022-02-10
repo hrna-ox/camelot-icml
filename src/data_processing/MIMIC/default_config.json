@@ -1,1 +1,0 @@
-{"data_name": "MIMIC", "outcome_window": 12, "feat_set": "vit-sta", "time_range": [0, 100], "include_time": false, "train_test_ratio": 0.7, "train_val_ratio": 0.6, "seed": 2323}

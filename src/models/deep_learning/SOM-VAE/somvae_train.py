@@ -8,28 +8,15 @@ License: MIT License
 If you want to optimize the hyperparameters using labwatch, you have to install labwatch and SMAC
 and comment in the commented out lines.
 """
-import os
-import sys
 import uuid
 import shutil
-from glob import glob
 from datetime import date
 
-
-
-import numpy as np
 import tensorflow as tf
-import pandas as pd
-from sklearn.metrics import mean_squared_error
-from tqdm import tqdm, trange
+from tqdm import tqdm
 import sacred
-from sacred.stflow import LogFileWriter
 from sklearn.model_selection import train_test_split
 
-from labwatch.assistant import LabAssistant
-from labwatch.optimizers.random_search import RandomSearch
-from labwatch.optimizers.smac_wrapper import SMAC
-from labwatch.optimizers.bayesian_optimization import BayesianOptimization
 from labwatch import hyperparameters as hyper
 
 from somvae_model import SOMVAE
