@@ -455,7 +455,7 @@ class AttentionRNNEncoder(LSTMEncoder):
         """
         latent_reps = super().call(inputs, training=False)
 
-        return self.feature_time_att_layer.compute_unnorm_scores(inputs, latent_reps, cluster_reps)
+        return self.feat_time_attention_layer.compute_unnorm_scores(inputs, latent_reps, cluster_reps)
 
     def compute_norm_scores(self, inputs, cluster_reps=None):
         """Compute normalised scores alpha, beta, gamma given input data and cluster representation vectors.
@@ -471,7 +471,7 @@ class AttentionRNNEncoder(LSTMEncoder):
         """
         latent_reps = super().call(inputs, training=False)
 
-        return self.feature_time_att_layer.compute_norm_scores(inputs, latent_reps, cluster_reps)
+        return self.feat_time_attention_layer.compute_norm_scores(inputs, latent_reps, cluster_reps)
 
     def get_config(self):
         """Update configuration for layer."""

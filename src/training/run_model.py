@@ -10,10 +10,12 @@ import os, json
 import src.training.utils as utils#
 from src.training.data_loader import data_loader
 
+import tensorflow as tf
+
 # physical_devices = tf.config.list_physical_devices('GPU')
 # tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 """
 Load configuration files and hyper-parameters.
@@ -32,13 +34,14 @@ with open("src/training/training_config.json", "r") as f:
 data_info = data_loader(**data_config)
 output_dim = data_info["y"][-1].shape[-1]
 
+    
 # Update model config
 model_config["output_dim"] = output_dim
 
 # Load model and fit
-print("NEED TO CHECK WHAT IS HAPPENING WITH LCLUS AND LPRED \n\n\n\n")
+print("\n\n\n\n")
 model = utils.get_model_from_str(**model_config)
 model.train(data_info=data_info, **training_config)
 
 # Compute data test
-output_results = model.evaluate(data_info)
+output_results = model.analyse(data_info)

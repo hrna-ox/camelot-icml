@@ -38,8 +38,8 @@ def data_loader(data_name: str = "MIMIC", feat_set: Union[List, str] = "vit", ti
     # Convert to input format, and keep track of useful information
     x, y, mask, ids, feats, outcomes, X_feat, y_outc = data_processor.load_transform()
     print(f"{data_name} data successfully loaded.")
-    print(f"Basic information \n Number of Patients: {X_feat.pat_id.nunique()} \n "
-          f"Number of observations: {X_feat.shape[0]} \n Outcome Distribution: {y_outc.sum(axis=0)}")
+    print(f"Basic information \n",
+          f"Input shape: {x.shape}, {y.shape} \n Outcome Distribution: {y_outc.sum(axis=0)}")
 
     # Separate into train, val and test data
     X_train, X_test, y_train, y_test, id_train, id_test, mask_train, mask_test = train_test_split(
@@ -64,7 +64,7 @@ def data_loader(data_name: str = "MIMIC", feat_set: Union[List, str] = "vit", ti
     # Aggregate into output
     output = {"X": (X_train, X_val, X_test),
               "y": (y_train, y_val, y_test),
-              "id": (id_train, id_val, id_test),
+              "ids": (id_train, id_val, id_test),
               "mask": (mask_train, mask_val, mask_test),
               "feats": feats,
               "norm_min": min_,

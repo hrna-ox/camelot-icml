@@ -24,7 +24,7 @@ LOGS_DIR = "experiments/camelot/"
 
 
 def tf_log(tensor):
-    return tf.cast(tf.math.log(tensor + 1e-8), dtype="float32")
+    return tf.math.log(tensor + 1e-8)
 
 
 def np_log(array):
@@ -92,6 +92,31 @@ def unsupervised_scores(x, y_pred=None, seed: int = 4347):
     sil = silhouette_score(X=x, labels=clus_pred, random_state=seed)
 
     return dbs, chs, sil
+
+
+def class_weighting(y_true):
+    """
+    Function to compute inverse class proportion weighting given array of true class assignments.
+
+    Params:
+    - y_true: array-like of shape (N, num_outcs) with corresponding one-hot encoding assignment of true class
+
+    Returns:
+    - weights: array-like of shape (num_outcs) with weights inversely proportional to number of true class examples.
+    """
+
+    class_numbers = tf.reduce_sum(y_true, axis=0)
+
+    # Check no class is missing
+    if not tf.reduce_all(class_numbers > 0):
+        class_numbers += 1
+        
+
+    # Compute reciprocal
+    inv_class_numbers = 1 / class_numbers
+
+    return inv_class_numbers / tf.reduce_sum(inv_class_numbers)
+
 
 
 # ------------------------------------------------------------------------------------

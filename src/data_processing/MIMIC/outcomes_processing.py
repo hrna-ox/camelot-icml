@@ -126,7 +126,7 @@ def main():
     """
 
     # Number of Patients and number of observations.
-    print(f"Number of cohort patient: {vitals_final.pat_id.nunique()}")
+    print(f"Number of cohort patient: {vitals_final.stay_id.nunique()}")
     print(f"Number of observations: {vitals_final.shape[0]}")
 
     # Save to output variables

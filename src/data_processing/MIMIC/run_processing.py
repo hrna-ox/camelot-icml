@@ -5,21 +5,27 @@ Process MIMIC-ED Data file.
 - Vital observations are consequently processed based on existing observations.
 - Finally, outcome targets are processed.
 """
-
+import os
 import src.data_processing.MIMIC.admissions_processing as admissions_processing
 import src.data_processing.MIMIC.vitals_processing as vitals_processing
 import src.data_processing.MIMIC.outcomes_processing as outcomes_processing
 
+print("Current Directory: ", os.getcwd())
 
 def main():
-    # Run admissions
-    admissions_processing.main()
+
+
+    # Run admissions if not processed
+    if not os.path.exists("data/MIMIC/interim/admissions_intermediate.csv"):
+    	admissions_processing.main()
 
     # Run vitals
-    vitals_processing.main()
+    if not os.path.exists("data/MIMIC/interim/vitals_intermediate.csv"):
+    	vitals_processing.main()
 
     # Run outcomes
-    outcomes_processing.main()
+    if not os.path.exists("data/MIMIC/interim/vitals_final.csv"):
+    	outcomes_processing.main()
 
     pass
 
