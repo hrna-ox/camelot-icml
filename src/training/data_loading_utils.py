@@ -188,7 +188,15 @@ def impute(X):
 
 
 def get_ids(data_folder):
-    """Get input id information."""
+    """
+    Get input id information.
+
+    Params:
+    - data_folder: str, folder of dataset, or name of dataset.
+
+    Returns:
+        - Tuple of id col, time col and whether time to end needs computation.
+    """
 
     # Check Processed data folder exists
     try:

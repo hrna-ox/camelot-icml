@@ -1,28 +1,38 @@
+"""
+Main visualisation helper file for visualising results and data.
+"""
+import src.visualisation.vis_utils as utils
+import matplotlib.pyplot as plt
 import numpy as np
 
-import matplotlib.pyplot as plt
-from src.training.data_loader import data_loader
-from src.training.data_loader import MIMIC_DEFAULT_LOAD_CONFIG, HAVEN_DEFAULT_LOAD_CONFIG
+def plot_trajectories_per_data_group(data_info):
+    """
+    Plot Average Trajectories per Input Data Group.
 
-data_config = MIMIC_DEFAULT_LOAD_CONFIG
+    Params:
+    - data_info: dictionary of data input data configuration.
+    - output_results: dictionary of output results.
 
-data_info = data_loader(data_config)
+    Results:
+    - Plot (and saved) of figure of data mean trajectories.
+    """
+    X, y = data_info["X_og"], data_info["y"]
+    features, outcomes = data_info["feats"], data_info["outcomes"]
+    data_name = data_info["data_loading_config"]["data_name"]
 
-# Get whole data
-X = np.concatenate(data_info["X"], axis = 0)
-y = np.concatenate(data_info["y"], axis = 0)
-ids = np.concatenate(data_info["id"], axis=0)
+    # Initialise processor class
+    data_visualiser = utils.GroupVisualiser(X_og=X, y_og=y, features=features, outcomes=outcomes, data_name=data_name)
 
-data = np.concatenate((ids, X), axis=-1)
-feats = data_info["feats"]
-time_feats = [feat in feats if feat not in ["ESI", "age", "gender"]]
+    # Get figure
+    nrows, ncols = int(np.ceil(len(features)/ 2)), 2
+    fig, ax = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=False)
 
-# Plot Average Trajectories
-fig, ax = plt.subplots(nrows = 3, ncols=2, sharex=True, sharey=False)
-axs = ax.reshape(-1)
-for feat_id, feat in enumerate(time_feats[2:]):
+    # Make plots
+    ax = data_visualiser.plot_time_groups(ax=ax)
 
-    # Make Plot
-    avg_ = np.mean(data[:, :, feats.index(feat)], axis=0)
-    sterror_ = np.std(data[:, :, feats.index(feat)], axis=0) / np.sqrt()
-    axs[feat_id].plot()
+    # Decorate
+    ax[0].set_xlabel("Time to End (h)")
+    ax[0].invert_xaxis()
+
+    plt.title("Plot of Average Trajectories over time with standard error.")
+    plt.legend()
