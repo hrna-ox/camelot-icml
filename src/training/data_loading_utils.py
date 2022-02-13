@@ -136,29 +136,34 @@ def _median_fill(array):
     return array_out
 
 
-def _load(data_folder, window=4):
+def _load(data_name, window=4):
     """Load Trajectory, Target data jointly given data folder."""
 
-    # Check Processed data folder exists
+    # Make data folder
+    data_fd = f"data/{data_name}/processed/"
     try:
-        assert os.path.exists(data_folder)
+        os.path.exists(data_fd)
     except AssertionError:
-        print(f"Folder does not Exist. Check data has been processed. Input to the load function is {data_folder}.")
+        print(data_fd)
 
     if "HAVEN" in data_folder:
-        X = pd.read_csv(data_folder + "COPD_VLS_process.csv", parse_dates=HAVEN_PARSE_TIME_VARS, header=0)
-        y = pd.read_csv(data_folder + "copd_outcomes.csv", index_col=0)
+
+        # Load Data
+        X = pd.read_csv(data_fd + "COPD_VLS_process.csv", parse_dates=HAVEN_PARSE_TIME_VARS, header=0)
+        y = pd.read_csv(data_fd + "copd_outcomes.csv", index_col=0)
 
     elif "MIMIC" in data_folder:
 
-        # Load observation and static variables. Convert timedelta columns
+        # Load Data
         X = pd.read_csv(data_folder + "vitals_process.csv", parse_dates=MIMIC_PARSE_TIME_VARS, header=0, index_col=0)
-        X = convert_to_timedelta(X, *MIMIC_PARSE_TD_VARS)
-
-        # Load outcomes based on target window
         y = pd.read_csv(data_folder + f"outcomes_{window}h_process.csv", index_col=0)
 
+        # Convert columns to timedelta
+        X = convert_to_timedelta(X, *MIMIC_PARSE_TD_VARS)
+
     elif "SAMPLE" in data_folder:
+
+        # Load data
         X = None
         y = None
 
@@ -327,8 +332,7 @@ class DataProcessor:
         """Load Dataset according to given parameters."""
 
         # Load data
-        data_folder = f"data/{self.dataset_name}/processed/"
-        data = _load(data_folder, window=self.target_window)
+        data = _load(self.dataset_name, window=self.target_window)
 
         # Get data info
         self.id_col, self.time_col, self.needs_time_to_end_computation = get_ids(data_folder)
