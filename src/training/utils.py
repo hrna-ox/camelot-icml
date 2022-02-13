@@ -6,6 +6,11 @@ Created on Sun Nov 21 10:48:57 2021
 @author: henrique.aguiar@ds.ccrg.kadooriecentre.org
 """
 
+"""
+SOME OF THESE ARE FOR EVALUATION.
+"""
+
+
 from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
 from sklearn.metrics import roc_auc_score, f1_score, recall_score
 import numpy as np

@@ -152,7 +152,7 @@ class CAMELOT(tf.keras.Model):
         assigned to clusters. Cluster representations are used to predict outcome.
 
         Params:
-        - inputs: array-like of shape (bs, T, D_f) of input data.https://en.wikipedia.org/wiki/Schauder_basis
+        - inputs: array-like of shape (bs, T, D_f) of input data.
 
         Returns: tuple of arrays:
             - y_pred: array-like of shape (bs, outcome_dim) with probability assignments.
@@ -195,7 +195,7 @@ class CAMELOT(tf.keras.Model):
         Method to select cluster representation vector given cluster assignment.
 
         Params:
-        - cluster_samples: array-like of shape (bs, ) with the corresponding cluster.
+        - clus_samp: array-like of shape (bs, ) with the corresponding cluster.
 
         Returns:
             - output: array-like of shape (bs, latent_dim) with the corresponding cluster representation vector.
@@ -223,7 +223,7 @@ class CAMELOT(tf.keras.Model):
 
         # Unpack inputs
         x, y = inputs[0], inputs[1]
-        
+
         # Define variables for each network
         pred_vars = [var for var in self.trainable_variables if 'predictor' in var.name.lower()]
         enc_id_vars = [var for var in self.trainable_variables if 'encoder' in var.name.lower() or
@@ -233,13 +233,12 @@ class CAMELOT(tf.keras.Model):
         # Initialise GradientTape to compute gradients
         with tf.GradientTape(watch_accessed_variables=False, persistent=True) as tape:
             tape.watch(pred_vars + enc_id_vars + [rep_vars])
-            
+
             # Make forward pass
             y_pred, pi = self.forward_pass(x)
 
             if self.weighted_loss is True:
                 self.loss_weights = model_utils.class_weighting(y)
-                
 
             # compute losses
             l_pred = model_utils.l_pred(y, y_pred, weights=self.loss_weights)
@@ -268,9 +267,14 @@ class CAMELOT(tf.keras.Model):
                 - X: array-like of shape (bs, T, D_f) of input time-series feature data.
                 - y: array-like of shape (bs, num_outcs) of input outcome class data.
         """
+
+        # Unpack input data
         x, y = inputs
+
+        # Make forward pass
         y_pred, pi = self.forward_pass(x)
 
+        # Update loss weights depending on batch
         if self.weighted_loss is True:
             self.loss_weights = model_utils.class_weighting(y)
 
@@ -389,10 +393,6 @@ class CAMELOT(tf.keras.Model):
             print("End of epoch %d - \n Training loss: %.4f  Validation loss %.4f" % (
                 epoch, epoch_loss / step_, loss_val))
             self.enc_pred_loss_tracker.loc[epoch, :] = [epoch_loss / step_, loss_val]
-
-            # Check if has improved or not
-            if self.enc_pred_loss_tracker.iloc[-50:, -1].le(loss_val + 0.001).any():
-                break
 
     def _initialise_clus(self, x, val_x, **kwargs):
         """
@@ -572,15 +572,6 @@ class CAMELOT(tf.keras.Model):
     def get_config(self):
         """Update configuration for layer."""
         config = super().get_config().copy()
-        config.update({"latent_dim": self.latent_dim, "hidden_layers": self.hidden_layers,
-                       "hidden_nodes": self.hidden_nodes, "state_fn": self.state_fn,
-                       "recurrent_fn": self.recurrent_fn, "return_sequences": self.return_sequences,
-                       "dropout": self.dropout, "recurrent_dropout": self.recurrent_dropout,
-                       "regulariser_params": self.regulariser_params})
-        """Update configuration for layer."""
-
-        # Load existing configuration
-        config = super().get_config().copy()
 
         # Update configuration
         config.update({f"{self.name}-K": self.K,
@@ -593,12 +584,17 @@ class CAMELOT(tf.keras.Model):
                        f"{self.name}-dropout": self.dropout,
                        f"{self.name}-weighted_loss": self.weighted_loss})
 
+        # Update configuration for each model
+        config.update(self.Encoder.get_config())
+        config.update(self.Predictor.get_config())
+        config.update(self.Selector.get_config())
+
         return config
 
 
 class Model(CAMELOT):
     """
-    Model Class Wrapper for CAMELOT with fit and evaluate methods.
+    Model Class Wrapper for CAMELOT with train and analyse methods.
     """
 
     def __init__(self, output_dim: int = 4, **kwargs):
@@ -616,12 +612,12 @@ class Model(CAMELOT):
         self.model_name = "camelot"
 
         # Initialise training parameters
-        self.training_params = None
+        self.train_params = None
 
         super().__init__(output_dim=output_dim, **kwargs)
 
     def train(self, data_info, lr: float = 0.001, epochs_init: int = 100, epochs: int = 100, bs: int = 32,
-            cbck_str: str = "auc-sup-scores-cm", **kwargs):
+              cbck_str: str = "auc-sup-scores-cm", **kwargs):
         """
         Fit method for training CAMELOT model.
 
@@ -657,7 +653,7 @@ class Model(CAMELOT):
         # Train model on initialisation procedure
         print("-" * 20, "\n", "Initialising Model", sep="\n")
         self.initialise_model(data=(X_train, y_train), val_data=(X_val, y_val), epochs=epochs_init,
-                             learning_rate=lr, batch_size=bs)
+                              learning_rate=lr, batch_size=bs)
 
         # Main Training phase
         print("-" * 20, "\n", "STARTING MAIN TRAINING PHASE")
@@ -665,7 +661,7 @@ class Model(CAMELOT):
                                                        early_stop=True, lr_scheduler=True, tensorboard=True)
         self.run_num = run_num
         self.fit(x=X_train, y=y_train, validation_data=(X_val, y_val), batch_size=bs, epochs=epochs,
-                 verbose=1)
+                 verbose=1, callbacks=callbacks)
 
     def analyse(self, data_info):
         """
@@ -696,7 +692,7 @@ class Model(CAMELOT):
         outc_dims = data_info["outcomes"]
         save_fd = f"results/{self.model_name}/run{self.run_num}/"
         track_fd = f"experiments/{self.model_name}/run{self.run_num}/"
-        
+
         if not os.path.exists(save_fd):
             os.makedirs(save_fd)
 
@@ -727,21 +723,6 @@ class Model(CAMELOT):
         alpha, beta, gamma = self.compute_unnorm_attention_weights(X_test)
         alpha_norm, beta_norm, gamma_norm = self.compute_norm_attention_weights(X_test)
 
-        # Finally, compute scores
-        auc, nmi, ars, purity = model_utils.supervised_scores(y_test, output_test)
-        # dbs, chs, sil = model_utils.unsupervised_scores(X_test.reshape(X_test.shape[0], -1), output_test, # self.seed)
-
-        # Compute unsupervised metrics on latent
-        projs = self.Encoder(X_test).numpy()
-        # dbs_lat, chs_lat, sil_lat = model_utils.unsupervised_scores(projs, y_pred, self.seed)
-
-        # Combine into a single pandas Series
-        sup_scores = pd.Series([auc, nmi, ars, purity],
-                                  index=["AUC", "NMI", "ARS", "Purity"])
-        # unsup_scores = pd.Series([dbs, dbs_lat, chs, chs_lat, sil, sil_lat],
-        #                          index=["DBS", "DBS_lat", "CHS", "CHS_lat", "SIL",
-        #                                  "SIL_lat"])
-
         # Save output data
         y_pred.to_csv(save_fd + "y_pred.csv", index=True, header=True)
         outc_pred.to_csv(save_fd + "outc_pred.csv", index=True, header=True)
@@ -750,13 +731,6 @@ class Model(CAMELOT):
         clus_pred.to_csv(save_fd + "clus_pred.csv", index=True, header=True)
         clus_phenotypes.to_csv(save_fd + "clus_phenotypes.csv", index=True, header=True)
         np.save(save_fd + "cluster_representations.npy", cluster_rep_set, allow_pickle=True)
-
-        # Save metric results
-        sup_scores.to_csv(save_fd + "sup_scores.csv", index=True, header=True)
-        # unsup_scores.to_csv(save_fd + "unsup_scores.csv", index=True, header=True)
-        print("\nSupervised Scores\n", f"AUC {auc:.2f} | NMI {nmi:.2f} | ARS {ars:.2f} | Purity {purity:.2f}")
-        # print("\nUnsupervised Scores\n",
-        #       f"DBS {dbs:.2f}, {dbs_lat:.2f} | CHS {chs:.2f}, {chs_lat:.2f} | SIL {sil:.2f}, {sil_lat:.2f}")
 
         # save init losses
         init_loss_1.to_csv(track_fd + "enc_pred_init_loss.csv", index=True, header=True)
@@ -785,5 +759,5 @@ class Model(CAMELOT):
 
         # Print Data
         print(f"\n\n Experiments saved under {track_fd} and {save_fd}")
-        
+
         return output_results

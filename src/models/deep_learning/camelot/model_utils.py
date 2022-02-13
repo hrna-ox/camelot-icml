@@ -59,7 +59,7 @@ def supervised_scores(y_true, y_pred):
     class_pred = np.argmax(y_pred, axis=-1)
 
     # Compute scores
-    auc = roc(y_true, y_pred, multi_class="ovr")
+    auc = roc(y_true, y_pred, multi_class="ovr", scores=None)
     nmi = normalized_mutual_info_score(labels_true=class_true, labels_pred=class_pred)
     ars = adjusted_rand_score(labels_true=class_true, labels_pred=class_pred)
     purity = purity_score(y_true=class_true, y_pred=class_pred)
@@ -154,7 +154,6 @@ def l_pred(y_true, y_pred, weights=None, name='pred_clus_loss'):
 
 
 def l_clus(cluster_reps, name='embedding_sep_loss'):
-    """Compute Embedding separation Loss on embedding vectors."""
     """Cluster representation separation loss. Computes negative euclidean distance summed over pairs of cluster 
     representation vectors. This loss is minimised as cluster vectors are separated 
 
@@ -181,7 +180,7 @@ def l_clus(cluster_reps, name='embedding_sep_loss'):
     return norm_loss
 
 
-def l_dist(clusters_prob):
+def l_dist(clusters_prob, name="loss_clus_dist"):
     """
     Cluster distribution loss. Computes negative entropy of cluster distribution probability values.
     This is minimised when the cluster distribution is uniform (all clusters similar size).
@@ -198,7 +197,7 @@ def l_dist(clusters_prob):
     clus_avg_prob = tf.reduce_mean(clusters_prob, axis=0)
 
     # Compute negative entropy
-    neg_entropy = tf.reduce_sum(clus_avg_prob * tf_log(clus_avg_prob))
+    neg_entropy = tf.reduce_sum(clus_avg_prob * tf_log(clus_avg_prob),  name=name)
 
     return neg_entropy
 
@@ -225,8 +224,7 @@ class CEClusSeparation(cbck.Callback):
 
         # Compute outcome weights if weighted=True
         if weighted is True:
-            class_numbers = tf.reduce_sum(self.y_val, axis=0).numpy()
-            self.weights = class_numbers / np.sum(class_numbers + 1e-8)
+            self.weights = class_weighting(self.y_val)
 
         else:
             self.weights = np.ones(shape=(self.y_val.get_shape()[0]))
@@ -237,8 +235,8 @@ class CEClusSeparation(cbck.Callback):
         if epoch % self.interval == 0:
 
             # Initialise callback value, and determine K
-            cbck_value, K = 0, self.model.cluster_reps.numpy().shape[0]
-            clus_phenotypes = self.model.Predictor(self.model.cluster_reps).numpy()
+            cbck_value, K = 0, self.model.K
+            clus_phenotypes = self.model.compute_cluster_phenotypes()
 
             # Iterate over all pairs of clusters and compute symmetric CE
             for i in range(K):
@@ -269,7 +267,7 @@ class ConfusionMatrix(cbck.Callback):
         self.X_val, self.y_val = validation_data
 
         # Compute number of outcomes
-        self.num_outcs = self.y_val.shape[-1]
+        self.C = self.y_val.shape[-1]
 
     def on_epoch_end(self, epoch, **kwargs):
 
@@ -277,7 +275,7 @@ class ConfusionMatrix(cbck.Callback):
         if epoch % self.interval == 0:
 
             # Initialise output Confusion matrix
-            cm_output = np.zeros(shape=(self.num_outcs, self.num_outcs))
+            cm_output = np.zeros(shape=(self.C, self.C))
 
             # Compute prediction and true values in categorical format.
             y_pred = (self.model(self.X_val)).numpy()
@@ -291,12 +289,12 @@ class ConfusionMatrix(cbck.Callback):
                     cm_output[true_class, pred_class] = num_samples
 
             # Print as pd.dataframe
-            index = [f"TC{class_}" for class_ in range(1, self.num_outcs + 1)]
+            index = [f"TC{class_}" for class_ in range(1, self.C + 1)]
             columns = index
 
-            cm = pd.DataFrame(cm_output, index=index, columns=columns)
+            cm_output = pd.DataFrame(cm_output, index=index, columns=columns)
 
-            print("End of Epoch {:d} - Confusion matrix: \n {}".format(epoch, cm.astype(int)))
+            print("End of Epoch {:d} - Confusion matrix: \n {}".format(epoch, cm_output.astype(int)))
 
 
 class AUROC(cbck.Callback):
@@ -343,22 +341,22 @@ class PrintClusterInfo(cbck.Callback):
         if epoch % self.interval == 0:
 
             # Compute cluster_predictions
-            clus_pred = self.model.Identifier(self.model.Encoder(self.X_val)).numpy()
-            clus_assign = np.argmax(clus_pred, axis=-1)
-            K = clus_pred.shape[-1]
+            clus_pred = self.model.compute_pis(self.X_val)
+            clus_assign = self.model.clus_assign(self.X_val)
+
+            # Define K
+            K = self.model.K
 
             # Compute "hard" cluster assignment numbers
             hard_cluster_num = np.zeros(shape=K)
             for clus_id in range(self.K):
                 hard_cluster_num[clus_id] = np.sum(clus_assign == clus_id)
-            hard_cluster_num = pd.Series(hard_cluster_num, index=[f"Clus {k}" for k in range(1, K + 1)])
 
             # Compute average cluster distribution
             avg_cluster_dist = np.mean(clus_pred, axis=0)
 
             # Print Information
-            print("End of Epoch {:d} - hard_cluster_info {} - avg cluster prob dist {}".format(epoch, hard_cluster_num,
-                                                                                               avg_cluster_dist))
+            print(f"End of Epoch {epoch:d} - hard_cluster_info {hard_cluster_num} and avg dist{avg_cluster_dist}")
 
 
 class SupervisedTargetMetrics(cbck.Callback):
@@ -407,10 +405,14 @@ class UnsupervisedTargetMetrics(cbck.Callback):
         self.X_val, self.y_val = validation_data
 
     def on_epoch_end(self, epoch, **kwargs):
+
         if epoch % self.interval == 0:
+
             # Compute predictions and latent representations
             latent_reps = self.model.Encoder(self.X_val)
             model_output = (self.model(self.X_val)).numpy()
+
+            # Convert to categorical
             clus_pred = np.argmax(model_output, axis=-1)
 
             # Reshape input data and allow feature comparison
@@ -458,11 +460,11 @@ def cbck_list(summary_name: str, interval: int = 5, validation_data: tuple = ())
     if "unsup_scores" in summary_name.lower():
         extra_callback_list.append(UnsupervisedTargetMetrics(interval=interval, validation_data=validation_data))
 
-    return list(extra_callback_list)
+    return extra_callback_list
 
 
-def get_callbacks(validation_data, track_loss: str, interval: int = 5, other_cbcks: str = "", early_stop: bool = True, lr_scheduler: bool = True,
-                  tensorboard: bool = True, min_delta: float = 0.0001, patience: int = 100):
+def get_callbacks(validation_data, track_loss: str, interval: int = 5, other_cbcks: str = "", early_stop: bool = True,
+                  lr_scheduler: bool = True, tensorboard: bool = True, min_delta: float = 0.0001, patience: int = 100):
     """
     Generate complete list of callbacks given input configuration.
 
@@ -477,6 +479,8 @@ def get_callbacks(validation_data, track_loss: str, interval: int = 5, other_cbc
         - min_delta: if early stopping, the interval on which to check improvement or not.
         - patience: how many epochs to wait until checking for improvements.
         """
+
+    # Initialise empty
     callbacks = []
 
     # Handle saving paths and folders
@@ -511,17 +515,17 @@ def get_callbacks(validation_data, track_loss: str, interval: int = 5, other_cbc
     callbacks.append(csv_logger)
 
     # Check if Early stoppage is added
-    if early_stop:
+    if early_stop is True:
         callbacks.append(cbck.EarlyStopping(monitor='val_' + track_loss, mode="min", restore_best_weights=True,
                                             min_delta=min_delta, patience=patience))
 
     # Check if LR Scheduling is in place
-    if lr_scheduler:
+    if lr_scheduler is True:
         callbacks.append(cbck.ReduceLROnPlateau(monitor='val_' + track_loss, mode='min', cooldown=15,
                                                 min_lr=0.00001, factor=0.25))
 
     # Check if Tensorboard is active
-    if tensorboard:
+    if tensorboard is True:
         callbacks.append(cbck.TensorBoard(log_dir=save_fd + "logs/", histogram_freq=1))
 
     return callbacks, run_num

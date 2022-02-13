@@ -10,6 +10,8 @@ from tensorflow.keras.regularizers import l1_l2 as l1_l2_reg
 
 
 # ------------ Utility Functions --------------
+
+
 def _estimate_alpha(feature_reps, targets):
     """
     alpha parameters OLS estimation given projected input features and targets.
@@ -71,6 +73,7 @@ def _norm_abs(array, axis: int = 1):
     """
     array_abs = tf.math.abs(array) + 1e-8
 
+    # Normalise according to L1
     output = array_abs / tf.reduce_sum(array_abs, axis=axis, keepdims=True)
 
     return output
@@ -114,10 +117,9 @@ class MLP(Layer):
 
         # Add intermediate layers to the model
         for layer_id_ in range(self.hidden_layers):
+
             # Add Dense layer to model
-            layer_ = Dense(units=self.hidden_nodes,
-                           activation=self.activation_fn,
-                           kernel_regularizer=self.regulariser,
+            layer_ = Dense(units=self.hidden_nodes, activation=self.activation_fn, kernel_regularizer=self.regulariser,
                            activity_regularizer=self.regulariser)
 
             self.__setattr__('layer_' + str(layer_id_), layer_)
@@ -136,7 +138,8 @@ class MLP(Layer):
 
         # Iterate through hidden layer computation
         for layer_id_ in range(self.hidden_layers):
-            # Get layers
+
+            # Get layers and apply
             layer_ = self.__getattribute__('layer_' + str(layer_id_))
             dropout_layer_ = self.__getattribute__('dropout_layer_' + str(layer_id_))
 
@@ -174,7 +177,7 @@ class FeatTimeAttention(Layer):
     name: str, the name on which to save the layer. (default = "custom_att_layer")
     """
 
-    def __init__(self, units, activation="linear", name: str = "custom_layer"):
+    def __init__(self, units: int, activation: str = "linear", name: str = "custom_layer"):
 
         # Load layer params
         super().__init__(name=name)
@@ -194,10 +197,9 @@ class FeatTimeAttention(Layer):
         N, T, Df = input_shape
 
         # kernel, bias for feature -> latent space conversion
-        self.kernel = self.add_weight("kernel", shape=[1, 1, Df, self.units],
-                                      initializer="glorot_uniform", trainable=True)
-        self.bias = self.add_weight("bias", shape=[1, 1, Df, self.units],
-                                    initializer='uniform', trainable=True)
+        self.kernel = self.add_weight("kernel", shape=[1, 1, Df, self.units], initializer="glorot_uniform",
+                                      trainable=True)
+        self.bias = self.add_weight("bias", shape=[1, 1, Df, self.units], initializer='uniform', trainable=True)
 
         # Time aggregation learn weights
         self.unnorm_beta_weights = self.add_weight(name='time_agg', shape=[1, T, 1],
@@ -211,7 +213,7 @@ class FeatTimeAttention(Layer):
 
         Params:
         - inputs: tuple of two arrays:
-            - input_data: array-like of input data of shape (bs, T, D_f)
+            - x: array-like of input data of shape (bs, T, D_f)
             - latent_reps: array-like of representations of shape (bs, T, units)
 
         returns:
@@ -219,10 +221,10 @@ class FeatTimeAttention(Layer):
         """
 
         # Unpack input
-        input_data, latent_reps = inputs
+        x, latent_reps = inputs
 
         # Compute output state approximations
-        o_hat, _ = self.compute_o_hat_and_alpha(input_data, latent_reps)
+        o_hat, _ = self.compute_o_hat_and_alpha(x, latent_reps)
 
         # Normalise temporal weights and sum-weight approximations to obtain representation
         beta_scores = _norm_abs(self.unnorm_beta_weights)
@@ -230,12 +232,12 @@ class FeatTimeAttention(Layer):
 
         return z
 
-    def compute_o_hat_and_alpha(self, inputs, latent_reps):
+    def compute_o_hat_and_alpha(self, x, latent_reps):
         """
         Compute approximation to latent representations, given input feature data.
 
         Params:
-        - inputs: array-like of shape (bs, T, D_f)
+        - x: array-like of shape (bs, T, D_f)
         - latent_reps: array-like of shape (bs, T, units)
 
         returns:
@@ -245,8 +247,7 @@ class FeatTimeAttention(Layer):
         """
 
         # Compute feature projections
-        feature_projections = self.activation(
-            tf.math.multiply(tf.expand_dims(inputs, axis=-1), self.kernel) + self.bias)
+        feature_projections = self.activation(tf.math.multiply(tf.expand_dims(x, axis=-1), self.kernel) + self.bias)
 
         # estimate alpha coefficients through OLS
         alpha_t = _estimate_alpha(feature_projections, targets=latent_reps)
@@ -258,13 +259,16 @@ class FeatTimeAttention(Layer):
 
     def compute_unnorm_scores(self, inputs, latent_reps, cluster_reps=None):
         """
-        Compute unnorm_weights for attention values.
+        Compute unnormalised weights for attention values.
 
-        Params: - inputs: array-like of shape (bs, T, D_f) of input data - latent_reps: array-like of shape (bs, T,
-        units) of RNN cell output states. - cluster_reps: array-like of shape (K, units) of cluster representation
-        vectors (default = None). If None, gamma computation is skipped.
+        Params:
+        - inputs: array-like of shape (bs, T, D_f) of input data
+        - latent_reps: array-like of shape (bs, T, units) of RNN cell output states.
+        - cluster_reps: array-like of shape (K, units) of cluster representation vectors (default = None). If None,
+        gamma computation is skipped.
 
-        Returns: - output: tuple of arrays (alpha, beta, gamma) with corresponding values. If cluster_reps is None,
+        Returns:
+            - output: tuple of arrays (alpha, beta, gamma) with corresponding values. If cluster_reps is None,
         gamma computation is skipped.
         """
 
@@ -282,20 +286,23 @@ class FeatTimeAttention(Layer):
 
         return alpha_t, beta, gamma_t_k
 
-    def compute_norm_scores(self, inputs, latent_reps, cluster_reps=None):
+    def compute_norm_scores(self, x, latent_reps, cluster_reps=None):
         """
         Compute normalised attention scores alpha, beta, gamma.
 
-        Params: - inputs: array-like of shape (bs, T, D_f) of input data - latent_reps: array-like of shape (bs, T,
-        units) of RNN cell output states. - cluster_reps: array-like of shape (K, units) of cluster representation
-        vectors (default = None). If None, gamma computation is skipped.
+        Params:
+        - x: array-like of shape (bs, T, D_f) of input data
+        - latent_reps: array-like of shape (bs, T, units) of RNN cell output states.
+        - cluster_reps: array-like of shape (K, units) of cluster representation vectors (default = None). If None,
+        gamma computation is skipped.
 
-        Returns: - output: tuple of arrays (alpha, beta, gamma) with corresponding normalised scores. If cluster_reps
+        Returns:
+            - output: tuple of arrays (alpha, beta, gamma) with corresponding normalised scores. If cluster_reps
         is None, gamma computation is skipped.
         """
 
         # Load unnormalised scores
-        alpha, beta, gamma = self.compute_unnorm_scores(inputs, latent_reps, cluster_reps)
+        alpha, beta, gamma = self.compute_unnorm_scores(x, latent_reps, cluster_reps)
 
         # Normalise
         alpha_norm = _norm_abs(alpha, axis=1)
@@ -419,12 +426,12 @@ class AttentionRNNEncoder(LSTMEncoder):
         super().__init__(latent_dim=units, return_sequences=True, **kwargs)
         self.feat_time_attention_layer = FeatTimeAttention(units=units, activation=activation)
 
-    def call(self, inputs, mask=None, training: bool = True):
+    def call(self, x, mask=None, training: bool = True):
         """
         Forward pass of layer block.
 
         Params:
-        - inputs: array-like of shape (bs, T, D_f)
+        - x: array-like of shape (bs, T, D_f)
         - mask: array-like of shape (bs, T) (default = None)
         - training: bool indicating whether to make computation in training mode or not. (default = True)
 
@@ -433,19 +440,20 @@ class AttentionRNNEncoder(LSTMEncoder):
         """
 
         # Compute LSTM output states
-        latent_reps = super().call(inputs, mask=mask, training=training)
+        latent_reps = super().call(x, mask=mask, training=training)
 
         # Compute representation through feature time attention layer
-        attention_inputs = (inputs, latent_reps)
+        attention_inputs = (x, latent_reps)
         z = self.feat_time_attention_layer(attention_inputs)
 
         return z
 
-    def compute_unnorm_scores(self, inputs, cluster_reps=None):
-        """Compute unnormalised scores alpha, beta, gamma given input data and cluster representation vectors.
+    def compute_unnorm_scores(self, x, cluster_reps=None):
+        """
+        Compute unnormalised scores alpha, beta, gamma given input data and cluster representation vectors.
 
         Params:
-        - inputs: array-like of shape (bs, T, D_f)
+        - x: array-like of shape (bs, T, D_f)
         - cluster_reps: array-like of shape (K, units) of cluster representation vectors. (default = None)
 
         If cluster_reps is None, compute only alpha and beta weights.
@@ -453,9 +461,9 @@ class AttentionRNNEncoder(LSTMEncoder):
         Returns:
         - Tuple of arrays, containing alpha, beta, gamma unnormalised attention weights.
         """
-        latent_reps = super().call(inputs, training=False)
+        latent_reps = super().call(x, training=False)
 
-        return self.feat_time_attention_layer.compute_unnorm_scores(inputs, latent_reps, cluster_reps)
+        return self.feat_time_attention_layer.compute_unnorm_scores(x, latent_reps, cluster_reps)
 
     def compute_norm_scores(self, inputs, cluster_reps=None):
         """Compute normalised scores alpha, beta, gamma given input data and cluster representation vectors.
@@ -475,4 +483,4 @@ class AttentionRNNEncoder(LSTMEncoder):
 
     def get_config(self):
         """Update configuration for layer."""
-        return super().get_config()
+        return super().get_config().update(self.feat_time_attention_layer.get_config())
