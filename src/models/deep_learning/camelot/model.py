@@ -14,6 +14,7 @@ from tensorflow.keras import optimizers
 from sklearn.cluster import KMeans
 
 import os, json
+
 import src.models.deep_learning.camelot.model_utils as model_utils
 from src.models.deep_learning.model_blocks import MLP, AttentionRNNEncoder
 
@@ -29,7 +30,7 @@ class CAMELOT(tf.keras.Model):
     - latent_dim: dimensionality of latent space. (default = 32)
     - output_dim: dimensionality of output space. (default = 4)
     - seed: Seed to run analysis on. (default = 4347)
-    - name: Name to give the model. (default = "Camelot")
+    - name: Name to give the model. (default = "CAMELOT")
 
         (Loss functions)
     - alpha: weighting in cluster entropy. (default = 0.01)
@@ -71,7 +72,7 @@ class CAMELOT(tf.keras.Model):
     - weighted_loss: whether to use weights on predictive clustering loss (default = "True")
     """
 
-    def __init__(self, num_clusters=10, latent_dim=32, seed=4347, output_dim=4, name="Camelot",
+    def __init__(self, num_clusters=10, latent_dim=32, seed=4347, output_dim=4, name="CAMELOT",
                  alpha=0.01, beta=0.01, regulariser_params=(0.01, 0.01), dropout=0.6,
                  encoder_params=None, identifier_params=None, predictor_params=None, cluster_rep_lr=0.001,
                  optimizer_init="adam", weighted_loss=True):
@@ -609,10 +610,10 @@ class Model(CAMELOT):
         # Useful information
         self.model_config = {"output_dim": output_dim, **kwargs}
         self.run_num = 1
-        self.model_name = "camelot"
+        self.model_name = "CAMELOT"
 
         # Initialise training parameters
-        self.train_params = None
+        self.training_params = None
 
         super().__init__(output_dim=output_dim, **kwargs)
 
@@ -625,7 +626,7 @@ class Model(CAMELOT):
         - data_info: dictionary with data information and parameters.
         - "lr": learning rate for training (default = 0.001)
         - "epochs_init": number of epochs to train initialisation (default = 100)
-        - "epochs": number of epochs for main training (default = 100)
+        - "epochs": number of epochs for evaluate training (default = 100)
         - "bs": batch size (default = 32)
         - "cbck_str": callback_string indicating callbacks to print during training (default: "auc-sup-scores-cm)
         """
@@ -661,7 +662,7 @@ class Model(CAMELOT):
                                                        early_stop=True, lr_scheduler=True, tensorboard=True)
         self.run_num = run_num
         self.fit(x=X_train, y=y_train, validation_data=(X_val, y_val), batch_size=bs, epochs=epochs,
-                 verbose=1, callbacks=callbacks)
+                 verbose=1, callbacks=callbacks, **kwargs)
 
     def analyse(self, data_info):
         """
@@ -670,14 +671,13 @@ class Model(CAMELOT):
         Params:
         - data_info: dictionary with data information.
 
-        Returns:
-            - y_pred: dataframe of shape (N, output_dim) with outcome probability prediction.
-            - outc_pred: Series of shape (N, ) with predicted outcome based on most likely outcome prediction.
-            - y_true: dataframe of shape (N, output_dim) ith one-hot encoded true outcome.
-            - pis_pred: dataframe of shape (N, K) of cluster probability assignment.
-            - clus_pred: Series of shape (N, ) with cluster assignment based on most likely cluster probability.
-            - clus_representations: Numpy array of shape (K, latent_dim) with corresponding luster representation vectors.
-            - clus_phenotypes: DataFrame of shape (K, output_dim) with predicted cluster outcome probability.
+        Returns: - y_pred: dataframe of shape (N, output_dim) with outcome probability prediction. - outc_pred:
+        Series of shape (N, ) with predicted outcome based on most likely outcome prediction. - y_true: dataframe of
+        shape (N, output_dim) ith one-hot encoded true outcome. - pis_pred: dataframe of shape (N, K) of cluster
+        probability assignment. - clus_pred: Series of shape (N, ) with cluster assignment based on most likely
+        cluster probability. - clus_representations: Numpy array of shape (K, latent_dim) with corresponding luster
+        representation vectors. - clus_phenotypes: DataFrame of shape (K, output_dim) with predicted cluster outcome
+        probability.
 
         Saves a variety of model information, as well.
         """
@@ -723,7 +723,8 @@ class Model(CAMELOT):
         alpha, beta, gamma = self.compute_unnorm_attention_weights(X_test)
         alpha_norm, beta_norm, gamma_norm = self.compute_norm_attention_weights(X_test)
 
-        # Save output data
+        # ----------------------------- Save Output Data --------------------------------
+        # Useful objects
         y_pred.to_csv(save_fd + "y_pred.csv", index=True, header=True)
         outc_pred.to_csv(save_fd + "outc_pred.csv", index=True, header=True)
         y_true.to_csv(save_fd + "y_true.csv", index=True, header=True)
@@ -751,13 +752,14 @@ class Model(CAMELOT):
             f.close()
 
         # Return objects
-        output_results = {
+        outputs_dic = {
             "y_pred": y_pred, "class_pred": outc_pred, "y_true": y_true, "pis_pred": pis_pred, "clus_pred": clus_pred,
-            "clus_representations": cluster_rep_set, "clus_phenotypes": clus_phenotypes, "sup_scores": sup_scores,
-            "init_loss_1": init_loss_1, "init_loss_2": init_loss_2
+            "clus_representations": cluster_rep_set, "clus_phenotypes": clus_phenotypes, "init_loss_1": init_loss_1,
+            "init_loss_2": init_loss_2, "attention_unnorm": (alpha, beta, gamma),
+            "attention_norm": (alpha_norm, beta_norm, gamma_norm), "save_fd": save_fd
         }
 
         # Print Data
         print(f"\n\n Experiments saved under {track_fd} and {save_fd}")
 
-        return output_results
+        return outputs_dic

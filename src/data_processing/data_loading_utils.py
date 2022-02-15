@@ -54,6 +54,7 @@ def _get_features(key, data_name="HAVEN"):
         elif data_name == "MIMIC":
             vitals = MIMIC_VITALS
             static = MIMIC_STATIC
+            vars1, vars2 = None, None
 
         elif data_name == "SAMPLE":
             vitals, vars1, vars2, static = None, None, None, None
@@ -116,7 +117,7 @@ def _numpy_backward_fill(array):
 
     # Add time indices where not masked, and propagate backward
     inter_array = np.where(~ array_mask, np.arange(array_mask.shape[1]).reshape(1, -1, 1), array_mask.shape[1] - 1)
-    inter_array = np.minimum.accumulate(inter_array[:, ::-1], axis=1)[:,::-1]
+    inter_array = np.minimum.accumulate(inter_array[:, ::-1], axis=1)[:, ::-1]
     array_out = array_out[np.arange(array_out.shape[0])[:, None, None],
                           inter_array,
                           np.arange(array_out.shape[-1])[None, None, :]]
@@ -146,29 +147,29 @@ def _load(data_name, window=4):
     except AssertionError:
         print(data_fd)
 
-    if "HAVEN" in data_folder:
+    if "HAVEN" in data_name:
 
         # Load Data
         X = pd.read_csv(data_fd + "COPD_VLS_process.csv", parse_dates=HAVEN_PARSE_TIME_VARS, header=0)
         y = pd.read_csv(data_fd + "copd_outcomes.csv", index_col=0)
 
-    elif "MIMIC" in data_folder:
+    elif "MIMIC" in data_name:
 
         # Load Data
-        X = pd.read_csv(data_folder + "vitals_process.csv", parse_dates=MIMIC_PARSE_TIME_VARS, header=0, index_col=0)
-        y = pd.read_csv(data_folder + f"outcomes_{window}h_process.csv", index_col=0)
+        X = pd.read_csv(data_fd + "vitals_process.csv", parse_dates=MIMIC_PARSE_TIME_VARS, header=0, index_col=0)
+        y = pd.read_csv(data_fd + f"outcomes_{window}h_process.csv", index_col=0)
 
         # Convert columns to timedelta
         X = convert_to_timedelta(X, *MIMIC_PARSE_TD_VARS)
 
-    elif "SAMPLE" in data_folder:
+    elif "SAMPLE" in data_name:
 
         # Load data
         X = None
         y = None
 
     else:
-        raise ValueError(f"Data Name does not match available datasets. Input Folder provided {data_folder}")
+        raise ValueError(f"Data Name does not match available datasets. Input Folder provided {data_fd}")
 
     return X, y
 
@@ -335,7 +336,7 @@ class DataProcessor:
         data = _load(self.dataset_name, window=self.target_window)
 
         # Get data info
-        self.id_col, self.time_col, self.needs_time_to_end_computation = get_ids(data_folder)
+        self.id_col, self.time_col, self.needs_time_to_end_computation = get_ids(self.dataset_name)
 
         return data
 
@@ -354,10 +355,10 @@ class DataProcessor:
         x_subset, features = self.subset_to_features(x_inter)
 
         # Convert to 3D array
-        x_inter, pat_time_ids = self.convert_to_3darray(x_subset)
+        x_3D, pat_time_ids = self.convert_to_3darray(x_subset)
 
         # Normalise array
-        x_inter = self.normalise(x_inter)
+        x_inter = self.normalise(x_3D)
 
         # Impute missing values
         x_out, mask = impute(x_inter)
@@ -370,7 +371,7 @@ class DataProcessor:
         # Check data loaded correctly
         _check_input_format(x_out, y_out)
 
-        return x_out, y_out, mask, pat_time_ids, features, outcomes, x_subset, y_data
+        return x_out, y_out, mask, pat_time_ids, features, outcomes, x_subset, x_3D, y_data
 
     def _add_time_to_end(self, X):
         """Add new column to dataframe - this computes time to end of grouped observations, if needed."""
@@ -390,7 +391,7 @@ class DataProcessor:
             x_inter["time_to_end"] = convert_datetime_to_hour(x_inter.loc[:, "time_to_end"])
 
         # Sort data
-        x_out = x_inter.sort_values(by = [self.id_col, "time_to_end"], ascending=[True, False])
+        x_out = x_inter.sort_values(by=[self.id_col, "time_to_end"], ascending=[True, False])
 
         return x_out
 
@@ -445,7 +446,6 @@ class DataProcessor:
 
         # Iterate through ids
         for id_ in tqdm(list_ids):
-
             # Subset data to where matches respective id
             index_ = np.where(list_ids == id_)[0]
             x_id = X[X[self.id_col] == id_]

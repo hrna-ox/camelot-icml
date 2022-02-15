@@ -5,7 +5,7 @@ Auxiliary Functions for Main Visualisation Make Plots.py file
 import numpy as np
 from matplotlib.cm import get_cmap
 
-from src.training.data_loading_utils import get_ids
+from src.data_processing.data_loading_utils import get_ids
 
 
 class GroupVisualiser:

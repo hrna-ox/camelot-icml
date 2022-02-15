@@ -5,12 +5,11 @@ Date Last updated: 24 Jan 2022
 Author: Henrique Aguiar
 Please contact via henrique.aguiar@eng.ox.ac.uk
 """
-import os, json
+import json
 
-import src.training.utils as utils
-from src.training.data_loader import data_loader
-
-import tensorflow as tf
+import src.models.model_utils as model_utils
+import src.results.evaluate as evaluate
+from src.data_processing.data_loader import data_loader
 
 # physical_devices = tf.config.list_physical_devices('GPU')
 # tf.config.experimental.set_memory_growth(physical_devices[0], True)
@@ -39,12 +38,13 @@ output_dim = data_info["y"][-1].shape[-1]
 
 # Load model and fit
 print("\n\n\n\n")
-model = utils.get_model_from_str(**model_config)
+model = model_utils.get_model_from_str(**model_config)
 model.train(data_info=data_info, **training_config)
 
 # Compute data test
-output_results = model.analyse(data_info)
+outputs_dic = model.analyse(data_info)
 
 # Evaluate model
+scores = evaluate(**outputs_dic, avg=None)
 
 # Useful visualisations

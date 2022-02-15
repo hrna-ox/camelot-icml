@@ -5,7 +5,7 @@ Load data into configuration dictionary for use on later end models.
 """
 
 from typing import Union, List, Tuple
-import src.training.data_loading_utils as data_utils
+import src.data_processing.data_loading_utils as data_utils
 
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -36,7 +36,7 @@ def data_loader(data_name: str = "MIMIC", feat_set: Union[List, str] = "vit", ti
                                               target_window=target_window)
 
     # Convert to input format, and keep track of useful information
-    x, y, mask, ids, feats, outcomes, X_feat, y_outc = data_processor.load_transform()
+    x, y, mask, ids, feats, outcomes, X_feat, X_feat_3D, y_outc = data_processor.load_transform()
     print(f"{data_name} data successfully loaded.")
     print(f"Basic information \n",
           f"Input shape: {x.shape}, {y.shape} \n Outcome Distribution: {y_outc.sum(axis=0)}")
@@ -67,9 +67,14 @@ def data_loader(data_name: str = "MIMIC", feat_set: Union[List, str] = "vit", ti
               "ids": (id_train, id_val, id_test),
               "mask": (mask_train, mask_val, mask_test),
               "feats": feats,
+              "id_col": data_processor.id_col,
+              "time_col": data_processor.time_col,
               "norm_min": min_,
               "norm_max": max_,
               "outcomes": outcomes,
+              "X_og": X_feat,
+              "y_og": y_outc,
+              "X_og_3D": X_feat_3D,
               "data_load_config": data_config
               }
 

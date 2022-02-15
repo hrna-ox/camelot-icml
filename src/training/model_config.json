@@ -3,7 +3,7 @@
    "num_clusters": 10,
    "latent_dim": 64,
    "seed": 2323,
-   "name": "Camelot",
+   "name": "CAMELOT",
    "alpha": 0.01,
    "beta": 0.01,
    "regulariser_params": [

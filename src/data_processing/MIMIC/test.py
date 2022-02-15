@@ -82,7 +82,7 @@ def admissions_processed_correctly(df: pd.DataFrame):
     assert test_time_before_death(df["outtime"], df["dod"])
     assert test_time_before_death(df["next_intime"], df["dod"])
 
-    # Uniqueness of main id columns
+    # Uniqueness of evaluate id columns
     assert test_is_unique_ids(df, "subject_id", "hadm_id", "stay_id", "next_transfer_id")
 
     # Completeness of id columns

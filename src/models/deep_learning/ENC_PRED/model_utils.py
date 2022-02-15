@@ -258,7 +258,7 @@ def get_callbacks(track_loss, early_stop=True, lr_scheduler=True, tensorboard=Tr
     """Generate list of callbacks, given input params.
 
     Params:
-        - track_loss: str, name of main loss to keep track of.
+        - track_loss: str, name of evaluate loss to keep track of.
         - early_stop: whether to stop training early in case of no progress. (default = True)
         - lr_scheduler: dynamically update learning rate. (default = True)
         - tensorboard: write tensorboard friendly logs which can then be visualised. (default = True)
@@ -268,7 +268,7 @@ def get_callbacks(track_loss, early_stop=True, lr_scheduler=True, tensorboard=Tr
     cbck_list = []
 
     # Handle saving paths and folders
-    logs_dir = "experiments/main/"
+    logs_dir = "experiments/evaluate/"
     if not os.path.exists(logs_dir):
         os.makedirs(logs_dir)
 

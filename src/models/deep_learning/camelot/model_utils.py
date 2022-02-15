@@ -6,21 +6,19 @@ Loss, Metrics and Callback functions to use for model
 @author: henrique.aguiar@ds.ccrg.kadooriecentre.org
 """
 import os
+
 import numpy as np
 import pandas as pd
-
 import tensorflow as tf
 import tensorflow.keras.callbacks as cbck
-
-from sklearn.metrics import roc_auc_score as roc
-from sklearn.metrics.cluster import contingency_matrix
 from sklearn.metrics import adjusted_rand_score, davies_bouldin_score, calinski_harabasz_score
 from sklearn.metrics import normalized_mutual_info_score, silhouette_score
+from sklearn.metrics import roc_auc_score as roc
 
 # ----------------------------------------------------------------------------------
 "Utility Functions and Global Params"
 
-LOGS_DIR = "experiments/camelot/"
+LOGS_DIR = "experiments/CAMELOT/"
 
 
 def tf_log(tensor):
@@ -29,69 +27,6 @@ def tf_log(tensor):
 
 def np_log(array):
     return np.log(array + 1e-8)
-
-
-def purity_score(y_true, y_pred):
-    # compute confusion matrix
-    contingency_matrix_ = contingency_matrix(y_true, y_pred)
-
-    return np.sum(np.amax(contingency_matrix_, axis=0)) / np.sum(contingency_matrix_ + 1e-8)
-
-
-def supervised_scores(y_true, y_pred):
-    """
-    Print Supervised Metric scores given set of true outcomes and predicted class.
-
-    Params:
-    - y_true: array-like of shape (N, num_outcs) with one-hot encoded true classes.
-    - y_pred: array-like of shape (N, num_outcs) with predicted outcome distribution.
-
-    Returns:
-        Tuple of scores:
-        - ROC AUC SCORE (One vs Rest)
-        - Normalised Mutual Information
-        - Adjusted Rand Score
-        - Purity
-    """
-
-    # Convert to categorical
-    class_true = np.argmax(y_true, axis=-1)
-    class_pred = np.argmax(y_pred, axis=-1)
-
-    # Compute scores
-    auc = roc(y_true, y_pred, multi_class="ovr", scores=None)
-    nmi = normalized_mutual_info_score(labels_true=class_true, labels_pred=class_pred)
-    ars = adjusted_rand_score(labels_true=class_true, labels_pred=class_pred)
-    purity = purity_score(y_true=class_true, y_pred=class_pred)
-
-    return auc, nmi, ars, purity
-
-
-def unsupervised_scores(x, y_pred=None, seed: int = 4347):
-    """
-    Print Supervised Metric scores given set of true outcomes and predicted class.
-
-    Params:
-    - X: array-like input data in two dimensions.
-    - y_pred: array-like of shape (N, num_outcs) with predicted outcome distribution.
-    - seed: int, seed to use for computing silhouette score. (default=4347)
-
-    Returns:
-        Tuple of scores:
-        - Davies Bouldin Scores
-        - Calinski Harabasz
-        - Silhouette Score
-    """
-
-    # Compute predicted class
-    clus_pred = np.argmax(y_pred, axis=-1)
-
-    # Compute metrics
-    dbs = davies_bouldin_score(x, labels=clus_pred)
-    chs = calinski_harabasz_score(x, labels=clus_pred)
-    sil = silhouette_score(X=x, labels=clus_pred, random_state=seed)
-
-    return dbs, chs, sil
 
 
 def class_weighting(y_true):
@@ -110,13 +45,11 @@ def class_weighting(y_true):
     # Check no class is missing
     if not tf.reduce_all(class_numbers > 0):
         class_numbers += 1
-        
 
     # Compute reciprocal
     inv_class_numbers = 1 / class_numbers
 
     return inv_class_numbers / tf.reduce_sum(inv_class_numbers)
-
 
 
 # ------------------------------------------------------------------------------------
@@ -197,7 +130,7 @@ def l_dist(clusters_prob, name="loss_clus_dist"):
     clus_avg_prob = tf.reduce_mean(clusters_prob, axis=0)
 
     # Compute negative entropy
-    neg_entropy = tf.reduce_sum(clus_avg_prob * tf_log(clus_avg_prob),  name=name)
+    neg_entropy = tf.reduce_sum(clus_avg_prob * tf_log(clus_avg_prob), name=name)
 
     return neg_entropy
 
@@ -384,9 +317,8 @@ class SupervisedTargetMetrics(cbck.Callback):
             # Target metrics
             nmi = normalized_mutual_info_score(labels_true=class_true, labels_pred=class_pred)
             ars = adjusted_rand_score(labels_true=class_true, labels_pred=class_pred)
-            purity = purity_score(y_true=class_true, y_pred=class_pred)
 
-            print("End of Epoch {:d} - NMI {:.2f} , ARS {:.2f} , Purity {:.2f}".format(epoch, nmi, ars, purity))
+            print("End of Epoch {:d} - NMI {:.2f} , ARS {:.2f}".format(epoch, nmi, ars))
 
 
 class UnsupervisedTargetMetrics(cbck.Callback):
@@ -405,9 +337,7 @@ class UnsupervisedTargetMetrics(cbck.Callback):
         self.X_val, self.y_val = validation_data
 
     def on_epoch_end(self, epoch, **kwargs):
-
         if epoch % self.interval == 0:
-
             # Compute predictions and latent representations
             latent_reps = self.model.Encoder(self.X_val)
             model_output = (self.model(self.X_val)).numpy()
@@ -470,7 +400,7 @@ def get_callbacks(validation_data, track_loss: str, interval: int = 5, other_cbc
 
     Params:
         - validation_data: tuple (X, y) of validation data.
-        - track_loss: str, name of main loss to keep track of.
+        - track_loss: str, name of evaluate loss to keep track of.
         - interval: int, interval to print information on.
         - other_cbcks: str, list of other callbacks to consider (default = "", which selects None).
         - early_stop: whether to stop training early in case of no progress. (default = True)

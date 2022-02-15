@@ -8,23 +8,22 @@ import json, csv, time
 import numpy as np
 import pandas as pd
 from tensorflow.keras import optimizers
-import tensorflow as tf
 
 from sklearn.model_selection import train_test_split
 
 # Add Directory path if does not exist
 sys.path.append(str(Path(os.path.abspath(__file__)).parents[4]))
 from src.models.benchmarks.ENC_PRED.model import LSTMEP
-from src.training import data_loading_utils as data_utils
-from src.training import utils as utils
+from src.data_processing import data_loading_utils as data_utils
+from src.models import model_utils as utils
 
 # ----------------------------------------------------------------------------------------
 "Environment setting"
 np.set_printoptions(precision=3, suppress=True)
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-RESULTS_FD = "results/main/"
-TRACK_FD = "experiments/main/"
+RESULTS_FD = "results/evaluate/"
+TRACK_FD = "experiments/evaluate/"
     
 # -----------------------------------------------------------------------------------------
 "PARSING ARGUMENTS"
@@ -56,14 +55,14 @@ parser.add_argument('--pred_hidden_nodes', default=32, type=int, help="num predi
 parser.add_argument('--pred_act_fn', default="sigmoid", type=str, help="predictor activation function.")
 
 # Compilation Parameters
-parser.add_argument('--lr', default=0.001, type=float, help="learning rate for main training phase.")
-parser.add_argument('--optimiser', default='adam', type=str, help="optimisation algorithm for main training phase.")
+parser.add_argument('--lr', default=0.001, type=float, help="learning rate for evaluate training phase.")
+parser.add_argument('--optimiser', default='adam', type=str, help="optimisation algorithm for evaluate training phase.")
 
 # Training Parameters
 parser.add_argument('--tts_split_1', default=0.4, type=float, help="ratio between train+val sets and all data.")
 parser.add_argument('--tts_split_2', default=0.6, type=float, help="ratio between train set and train + val.")
-parser.add_argument('--epochs', default=100, type=int, help="epochs for main training phase.")
-parser.add_argument('--batch_size', default=64, type=int, help="batch size for main training phase.")
+parser.add_argument('--epochs', default=100, type=int, help="epochs for evaluate training phase.")
+parser.add_argument('--batch_size', default=64, type=int, help="batch size for evaluate training phase.")
 
 
 # Data Loading Parameters
