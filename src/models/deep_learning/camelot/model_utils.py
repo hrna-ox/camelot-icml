@@ -400,7 +400,7 @@ def get_callbacks(validation_data, track_loss: str, interval: int = 5, other_cbc
 
     Params:
         - validation_data: tuple (X, y) of validation data.
-        - track_loss: str, name of evaluate loss to keep track of.
+        - track_loss: str, name of evaluate.py loss to keep track of.
         - interval: int, interval to print information on.
         - other_cbcks: str, list of other callbacks to consider (default = "", which selects None).
         - early_stop: whether to stop training early in case of no progress. (default = True)

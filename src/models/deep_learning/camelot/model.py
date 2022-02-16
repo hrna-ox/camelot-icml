@@ -626,7 +626,7 @@ class Model(CAMELOT):
         - data_info: dictionary with data information and parameters.
         - "lr": learning rate for training (default = 0.001)
         - "epochs_init": number of epochs to train initialisation (default = 100)
-        - "epochs": number of epochs for evaluate training (default = 100)
+        - "epochs": number of epochs for evaluate.py training (default = 100)
         - "bs": batch size (default = 32)
         - "cbck_str": callback_string indicating callbacks to print during training (default: "auc-sup-scores-cm)
         """

@@ -65,22 +65,22 @@ parser.add_argument('--pred_hidden_nodes', default=32, type=int, help="num predi
 parser.add_argument('--pred_act_fn', default="sigmoid", type=str, help="predictor activation function.")
 
 # Compilation Parameters
-parser.add_argument('--lr', default=0.001, type=float, help="learning rate for evaluate training phase.")
+parser.add_argument('--lr', default=0.001, type=float, help="learning rate for evaluate.py training phase.")
 parser.add_argument('--clus_lr', default=0.001, type=float, help="cluster representation update rate.")
 parser.add_argument('--lr_init', default=0.001, type=float, help="learning rate for initialisation.")
 parser.add_argument('--optimiser_init', default='adam', type=str, help="optimisation algorithm for initialisation.")
-parser.add_argument('--optimiser', default='adam', type=str, help="optimisation algorithm for evaluate training phase.")
+parser.add_argument('--optimiser', default='adam', type=str, help="optimisation algorithm for evaluate.py training phase.")
 
 # Training Parameters
 parser.add_argument('--tts_split_1', default=0.4, type=float, help="ratio between train+val sets and all data.")
 parser.add_argument('--tts_split_2', default=0.6, type=float, help="ratio between train set and train + val.")
 parser.add_argument('--epochs_init', default=50, type=int, help="epochs for initialisation steps.")
-parser.add_argument('--epochs', default=50, type=int, help="epochs for evaluate training phase.")
+parser.add_argument('--epochs', default=50, type=int, help="epochs for evaluate.py training phase.")
 parser.add_argument('--batch_size_init', default=64, type=int, help="batch size for initialisation.")
-parser.add_argument('--batch_size', default=64, type=int, help="batch size for evaluate training phase.")
+parser.add_argument('--batch_size', default=64, type=int, help="batch size for evaluate.py training phase.")
 
 # Callback Parameters
-parser.add_argument('--track_loss', default='L1', type=str, help="evaluate loss to track during training.")
+parser.add_argument('--track_loss', default='L1', type=str, help="evaluate.py loss to track during training.")
 parser.add_argument('--early_stop', default=True, type=bool, help="whether to stop early if no loss improvement.")
 parser.add_argument('--lr_scheduler', default=True, type=bool, help="whether to dynamically update learning rate.")
 parser.add_argument('--tensorboard', default=True, type=bool,

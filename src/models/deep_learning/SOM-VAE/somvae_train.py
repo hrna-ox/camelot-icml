@@ -226,7 +226,7 @@ def evaluate_model(model, x, modelpath, batch_size, data, embedding_string):
     mutual information, purity and mean squared error.
     
     Args:
-        model (SOM-VAE): Trained SOM-VAE model to evaluate.
+        model (SOM-VAE): Trained SOM-VAE model to evaluate.py.
         x (tf.Tensor): Input tensor or placeholder.
         modelpath (path): Path from which to restore the model.
         batch_size (int): Batch size for the evaluation.
@@ -280,7 +280,7 @@ def evaluate_model(model, x, modelpath, batch_size, data, embedding_string):
 
 @ex.automain
 def main(latent_dim, som_dim, learning_rate, decay_factor, alpha, beta, gamma, tau, seed, modelpath, save_model):
-    """Main method to build a model, train it and evaluate it.
+    """Main method to build a model, train it and evaluate.py it.
     
     Args:
         latent_dim (int): Dimensionality of the SOM-VAE's latent space.
