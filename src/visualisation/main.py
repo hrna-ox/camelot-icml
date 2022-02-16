@@ -6,7 +6,10 @@ email: henrique.aguiar@eng.ox.ac.uk
 """
 
 import matplotlib.pyplot as plt
+from sklearn.metrics.cluster import contingency_matrix as cont_matrix
+
 import pandas as pd
+import numpy as np
 
 import os, json
 
@@ -26,14 +29,17 @@ def visualise_cluster_groups(clus_pred, data_info: dict, save_fd: str, **kwargs)
     - Visualises cluster average trajectories for multiple features.
     - Saves figures to respective folders.
     """
-    # Re-define save_fd
-    save_fd = save_fd.replace("results", "visualisations").replace("experiments", "visualisations")
-    if not os.path.exists(save_fd):
-        os.makedirs(save_fd)
 
     # Unpack input data and data properties
     X, _ = data_info["data_og"]
     data_properties = data_info["data_properties"]
+
+    # Re-define save_fd
+    _, model_name, run_num, _ = save_fd.split("/")
+    save_fd = f"visualisations/{data_properties['data_name']}/{model_name}/{run_num}"
+
+    if not os.path.exists(save_fd):
+        os.makedirs(save_fd)
 
     # Subset to test set only
     ids_test, id_col = data_info["ids"][-1][:, 0, 0], data_properties["id_col"]
@@ -43,7 +49,7 @@ def visualise_cluster_groups(clus_pred, data_info: dict, save_fd: str, **kwargs)
     clus_onehot = pd.get_dummies(clus_pred)
 
     # Compute average static variables summary and trajectories
-    clus_summary_info, (fig, axs) = make_group_summaries(X_test, clus_onehot, **data_properties)
+    clus_summary_info, (fig, axs) = utils.make_group_summaries(X_test, clus_onehot, **data_properties)
 
     # Save configuration if available
     if "model_config" in kwargs.keys():
@@ -57,6 +63,7 @@ def visualise_cluster_groups(clus_pred, data_info: dict, save_fd: str, **kwargs)
 
     # Save axes
     fig.savefig(save_fd + "clus_time_feats_avg_trajs.png", dpi=200)
+    plt.close()
 
     return None
 
@@ -78,7 +85,7 @@ def visualise_data_groups(data_og, data_properties: dict, data_load_config: dict
     # Unpack input data
     X, y = data_og
 
-    data_outc_info, (fig, axs) = make_group_summaries(X, y, **data_properties)
+    data_outc_info, (fig, axs) = utils.make_group_summaries(X, y, **data_properties)
 
     # Get save path
     data_name = data_load_config["data_name"]
@@ -97,69 +104,151 @@ def visualise_data_groups(data_og, data_properties: dict, data_load_config: dict
 
     # Save axes
     fig.savefig(save_fd + "time_feats_avg_trajectories.png", dpi=200)
+    plt.close()
 
     return None
 
 
-def make_group_summaries(input_data: pd.DataFrame, groups_df: pd.DataFrame, id_col: str, time_col: str, **kwargs):
+def plot_losses(data_name: str, save_fd=None, history=None, **kwargs):
     """
-    Visualisation Function to compute summaries of data x_data subdivided into cohorts specified by groups_df.
+    Plot losses if:
+    a) history object has been provided (useful for neural networks)
+    b) any loss output has been provided.
 
     Params:
-    - input_data: pd.DataFrame with patient input data. Contains 2 identifier columns (at least), one for patient and
-    another for time of observation.
-    - groups_df: pd.DataFrame with group one-hot assignment or group probability assignment per each patient.
-    - id_col: str, which column of x_data identifies patient ids.
-    - time_col: str, which column of x_data identifies temporal info.
-
-    Returns:
-        - plots of temporal feature averages per sub-cohort with standard error deviation.
-        - prints summary statistics for static variables.
-        - Saves visualisations in corresponding folder.
-    """
-    if len(groups_df.shape) == 1:
-        groups_df = pd.get_dummies(groups_df)
-
-    # Get features
-    feats = input_data.columns.tolist()
-
-    # Separate into static and temporal feats
-    _, static_vars, time_vars = utils.separate_vars_by_type(feats)
-
-    # Compute per-group information
-    group_data_dic = utils.get_data_per_group(input_data, groups_df, id_col)
-
-    # Make summary statistics of static variables
-    summary_info = utils.make_summary_statistics(group_data_dic, static_vars, id_col)
-
-    # Make temporal plots
-    nrows, ncols = utils._nrows_ncols(len(time_vars))
-    fig, ax = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=False)
-    ax = utils.make_temporal_trajs(group_data_dic, time_vars, id_col, time_col, ax=ax)
-    plt.show()
-
-    return summary_info, (fig, ax)
-
-
-def visualise_clus_assignments():
-    pass
-
-
-def plot_losses(**kwargs):
-    """
-    Plot losses if any parameters passed containing the word loss.
-
-    Params:
+    - data_name: str, name of dataset for which results are being computed.
+    - save_fd: save_folder for figures. defaults to None, which does not save plots.
+    - history: Tensorflow history object with information about loss functions during training. If None, ignores this
+    parameter. (Default = None)
     **kwargs - dictionary key:value objects for multiple output-type objects.
 
     Returns:
         - Plot loss functions for all key values containing the expression loss.
     """
 
+    if save_fd is not None:
+
+        # Recompute save_fd and makedirs if it does not exist
+        _, model_name, run_num, _ = save_fd.split("/")
+        save_fd = f"visualisations/{data_name}/{model_name}/{run_num}/"
+
+        if not os.path.exists(save_fd):
+            os.makedirs(save_fd)
+
+    # Identify main training losses and plot if they exist
+    if history is not None:
+
+        # Compute main training losses - ignore validation, as these will be called manually
+        main_training_losses = [loss for loss in history.history.keys() if loss != "lr" and "val_" not in loss]
+
+        # Iterate over losses
+        for loss in main_training_losses:
+
+            # Get loss values
+            train_values = history.history[loss]
+            val_values = history.history[f"val_{loss}"]
+
+            # Plot loss
+            (fig, ax) = utils.plot_loss_fn(train_values, val_values)
+
+            ax.set_ylabel(f"Loss {loss} (-)")
+            ax.set_title(f"Evolution of loss {loss} during training.")
+
+            # Plot
+            plt.show()
+
+            # Save figure if save_fd provided
+            if save_fd is not None:
+                fig.savefig(save_fd + f"{loss}_evolution.png", dpi=200)
+                plt.close()
+
+    # Now do the same for any other loss value objects
     for key, value in kwargs.items():
         if "loss" in key:
-            # DO SOMETHING
-            pass
+
+            # Get train and validation values
+            train_values = value["train_loss"]
+            val_values = value["val_loss"]
+
+            # Make plot
+            (fig, ax) = utils.plot_loss_fn(train_values, val_values)
+
+            # Add Info
+            ax.set_ylabel(f"Loss {key} (-)")
+            ax.set_title(f"Evolution of loss {key} during training.")
+
+            # Plot
+            plt.show()
+
+            # Save figure if save_fd provided
+            if save_fd is not None:
+                fig.savefig(save_fd + f"{key}_evolution.png", dpi=200)
+                plt.close()
+
+    return None
+
+
+def visualise_cluster_assignment(clus_pred, data_info, pis_pred=None, save_fd=None, **kwargs):
+    """
+    Visualise distribution of cluster memberships probabilities, and how the different cluster behave with regards to
+    existing classes.
+
+    Params:
+    - clus_pred: array-like of shape (N, ) with categorical cluster assignment values.
+    - data_info: dict of data relevant information and object. Must contain key "y" with a 3-sized tuple object, where
+    the last index represents y_test.
+    - pis_pred: array-like of shape (N, num_clus) with predicted probability of cluster assignments. If None, then
+    ignore this parameter and consider only clus_pred. If not None, this overrides clus_pred.
+    - save_fd: where to save results. This will be overridden to save on the visualisations folder.
+
+    Returns:
+        - Plots a) average cluster probability assignment distributions.
+            b) Outcome distribution across all clusters.
+        - Saves plots if save_fd provided.
+    """
+    # Get y_test
+    labels_true = np.argmax(data_info["y"][-1], axis=1)
+    data_name = data_info["data_load_config"]["data_name"]
+
+    # Get right save_fd
+    if save_fd is not None:
+        _, model_name, run_num, _ = save_fd.split("/")
+        save_fd = f"visualisations/{data_name}/{model_name}/{run_num}/"
+
+        if not os.path.exists(save_fd):
+            os.makedirs(save_fd)
+
+    # Check if pis_pred exist
+    if pis_pred is not None:
+        clus_pred = np.argmax(pis_pred.values, axis=1)
+
+    # Compute contingency matrix
+    cm = pd.DataFrame(cont_matrix(labels_true=labels_true, labels_pred=clus_pred),
+                      index=data_info["data_properties"]["outc_names"],
+                      columns=[f"Clus {k}" for k in np.unique(clus_pred)])
+
+    # Print Contingency Matrix
+    if cm.shape[0] < cm.shape[1]:
+        cm = cm.T
+    print("Contingency Matrix outcomes x clusters: ", cm, sep="\n")
+
+    # Save contingency matrix
+    if save_fd is not None:
+        cm.to_csv(save_fd + "contingency_matrix.csv", index=True, header=True)
+
+    if pis_pred is not None:
+        fig, ax = utils.get_dists_per_clus(pis_pred)
+        fig.suptitle("Distribution of cluster membership assignment within each cluster.")
+        fig.supxlabel("Clusters")
+        fig.supylabel("Prob. Assign.")
+
+        # Plot
+        plt.show()
+
+        # Save if save_fd is provided
+        if save_fd is not None:
+            fig.savefig(save_fd + "pis_distribution_per_clus.png", dpi=200)
+            plt.close()
 
 
 def visualise_attention():

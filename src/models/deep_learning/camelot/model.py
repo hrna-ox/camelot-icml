@@ -359,7 +359,7 @@ class CAMELOT(tf.keras.Model):
         inputs = tf.data.Dataset.from_tensor_slices((x, y)).shuffle(buffer_size=5000).batch(batch_size)
 
         # Initialise loss tracker
-        self.enc_pred_loss_tracker = pd.DataFrame(data=np.nan, index=range(epochs), columns=["train_loss", "val_loss"])
+        self.enc_pred_loss_tracker = pd.DataFrame(data=np.nan, index=range(1, 1+ epochs), columns=["train_loss", "val_loss"])
         enc_pred_vars = [var for var in self.trainable_variables if "Encoder" in var.name or "Predictor" in var.name]
 
         # Iterate through epochs and batches
@@ -393,7 +393,7 @@ class CAMELOT(tf.keras.Model):
             # Print result and update tracker
             print("End of epoch %d - \n Training loss: %.4f  Validation loss %.4f" % (
                 epoch, epoch_loss / step_, loss_val))
-            self.enc_pred_loss_tracker.loc[epoch, :] = [epoch_loss / step_, loss_val]
+            self.enc_pred_loss_tracker.loc[epoch+1, :] = [epoch_loss / step_, loss_val]
 
     def _initialise_clus(self, x, val_x, **kwargs):
         """
@@ -464,7 +464,7 @@ class CAMELOT(tf.keras.Model):
         inputs = tf.data.Dataset.from_tensor_slices((X_train, clus_train_y)).shuffle(buffer_size=5000).batch(batch_size)
 
         # Initialise loss tracker
-        self.iden_loss_tracker = pd.DataFrame(data=np.nan, index=range(epochs), columns=["train_loss", "val_loss"])
+        self.iden_loss_tracker = pd.DataFrame(data=np.nan, index=range(1, 1 + epochs), columns=["train_loss", "val_loss"])
         iden_vars = [var for var in self.trainable_variables if "Identifier" in var.name]
 
         # Forward Identifier pass and train
@@ -499,7 +499,7 @@ class CAMELOT(tf.keras.Model):
             # Print result and update tracker
             print("End of epoch %d - \n Training loss: %.4f  Validation loss %.4f" % (
                 epoch, epoch_loss / step_, loss_val))
-            self.iden_loss_tracker.loc[epoch, :] = [epoch_loss / step_, loss_val]
+            self.iden_loss_tracker.loc[epoch + 1, :] = [epoch_loss / step_, loss_val]
 
             # Check if has improved or not - look at last 50 epoch validation loss and check if 
             if self.iden_loss_tracker.iloc[-50:, -1].le(loss_val + 0.001).any():
@@ -661,8 +661,10 @@ class Model(CAMELOT):
         callbacks, run_num = model_utils.get_callbacks((X_val, y_val), track_loss="L_pred", other_cbcks=cbck_str,
                                                        early_stop=True, lr_scheduler=True, tensorboard=True)
         self.run_num = run_num
-        self.fit(x=X_train, y=y_train, validation_data=(X_val, y_val), batch_size=bs, epochs=epochs,
+        history = self.fit(x=X_train, y=y_train, validation_data=(X_val, y_val), batch_size=bs, epochs=epochs,
                  verbose=2, callbacks=callbacks, **kwargs)
+
+        return history
 
     def analyse(self, data_info):
         """
@@ -757,8 +759,8 @@ class Model(CAMELOT):
         # Return objects
         outputs_dic = {
             "y_pred": y_pred, "class_pred": outc_pred, "y_true": y_true, "pis_pred": pis_pred, "clus_pred": clus_pred,
-            "clus_representations": cluster_rep_set, "clus_phenotypes": clus_phenotypes, "init_loss_1": init_loss_1,
-            "init_loss_2": init_loss_2, "attention_unnorm": (alpha, beta, gamma),
+            "clus_representations": cluster_rep_set, "clus_phenotypes": clus_phenotypes,
+            "init_loss_enc_pred": init_loss_1, "init_loss_iden": init_loss_2, "attention_unnorm": (alpha, beta, gamma),
             "attention_norm": (alpha_norm, beta_norm, gamma_norm), "save_fd": save_fd, "model_config": self.model_config
         }
 

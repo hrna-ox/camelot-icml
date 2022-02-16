@@ -6,6 +6,7 @@ import pandas as pd
 
 import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
+import seaborn as sns
 
 import json
 from typing import Union, List, Tuple
@@ -22,6 +23,71 @@ with open("data/HAVEN/processed/units_dic.json", "r") as f:
 with open("data/MIMIC/processed/units_dic.json", "r") as f:
     UNITS_DIC = {**UNITS_DIC, **json.load(f)}
     f.close()
+
+
+def plot_loss_fn(train_values: List, val_values: List):
+    """
+    Plot loss_function evolution during training given loss_values during training and validation.
+
+    Params:
+    - train_values: list object with loss values on training data.
+    - val_values: list object with loss values on validation data.
+
+    Returns:
+    - Tuple (Fig, ax) of figure, plt.ax objects with corresponding plot of loss_values.
+    """
+    # Compute Length of list
+    N = len(train_values)
+
+    # Initialise plot
+    fig, ax = plt.subplots()
+    ax.plot(range(1, N + 1), train_values, color="b")
+    ax.plot(range(1, N + 1), val_values, color="tab:orange")
+
+    # Add labels
+    ax.set_xlabel("Epochs")
+
+    return fig, ax
+
+
+def make_group_summaries(input_data: pd.DataFrame, groups_df: pd.DataFrame, id_col: str, time_col: str, **kwargs):
+    """
+    Visualisation Function to compute summaries of data x_data subdivided into cohorts specified by groups_df.
+
+    Params:
+    - input_data: pd.DataFrame with patient input data. Contains 2 identifier columns (at least), one for patient and
+    another for time of observation.
+    - groups_df: pd.DataFrame with group one-hot assignment or group probability assignment per each patient.
+    - id_col: str, which column of x_data identifies patient ids.
+    - time_col: str, which column of x_data identifies temporal info.
+
+    Returns:
+        - plots of temporal feature averages per sub-cohort with standard error deviation.
+        - prints summary statistics for static variables.
+        - Saves visualisations in corresponding folder.
+    """
+    if len(groups_df.shape) == 1:
+        groups_df = pd.get_dummies(groups_df)
+
+    # Get features
+    feats = input_data.columns.tolist()
+
+    # Separate into static and temporal feats
+    _, static_vars, time_vars = separate_vars_by_type(feats)
+
+    # Compute per-group information
+    group_data_dic = get_data_per_group(input_data, groups_df, id_col)
+
+    # Make summary statistics of static variables
+    summary_info = make_summary_statistics(group_data_dic, static_vars, id_col)
+
+    # Make temporal plots
+    nrows, ncols = _nrows_ncols(len(time_vars))
+    fig, ax = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=False)
+    ax = make_temporal_trajs(group_data_dic, time_vars, id_col, time_col, ax=ax)
+    plt.show()
+
+    return summary_info, (fig, ax)
 
 
 def separate_vars_by_type(feats: List) -> Tuple[List, List, List]:
@@ -278,3 +344,39 @@ def _compute_sterror(data: pd.DataFrame, time_col: str, id_col: str, feat: str) 
     time_ids = nansterror
 
     return time_ids, nansterror.values
+
+
+def get_dists_per_clus(pis_pred):
+    """
+    Visualise distribution information per each cluster membership given outcome likelihood probabilities y_pred.
+
+    Params:
+    - y_pred: array-like of shape (N, num_clus).
+
+    Returns:
+    - (fig, ax) object with IQR distributions of cluster_assignment for patients in a given cluster.
+    """
+    sns.set_theme(style="whitegrid")
+
+    if isinstance(pis_pred, pd.DataFrame):
+        pis_pred = pis_pred.values
+
+    # Get cluster assignments
+    clus_pred = np.argmax(pis_pred, axis=1)
+    N = pis_pred.shape[-1]
+
+    # Initialise plot
+    nrows, ncols = _nrows_ncols(N)
+    fig, ax = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=True)
+    axes = ax.reshape(-1)
+
+    # Iterate through each cluster
+    for clus_id, clus in enumerate(range(N)):
+        # Get ids for this cluster
+        clus_subset = pis_pred[clus_pred == clus]
+
+        # Plot IQR ranges
+        axes[clus_id].boxplot(x=clus_subset, labels=range(1, N+1))
+        axes[clus_id].set_title(f"Clus = {clus}")
+
+    return fig, axes

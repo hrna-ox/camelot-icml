@@ -7,8 +7,6 @@ Please contact via henrique.aguiar@eng.ox.ac.uk
 """
 import json
 
-import numpy as np
-
 from src.data_processing.data_loader import data_loader
 import src.models.model_utils as model_utils
 from src.results.main import evaluate
@@ -37,6 +35,7 @@ with open("src/training/training_config.json", "r") as f:
 "Data Loading."
 data_info = data_loader(**data_config)
 model_config["output_dim"] = data_info["y"][-1].shape[-1]
+data_name = data_config["data_name"]
 
 "Visualise Data Properties"
 # vis_main.visualise_data_groups(**data_info)
@@ -46,7 +45,7 @@ model_config["output_dim"] = data_info["y"][-1].shape[-1]
 "Load model and fit"
 print("\n\n\n\n")
 model = model_utils.get_model_from_str(**model_config)
-model.train(data_info=data_info, **training_config)
+history = model.train(data_info=data_info, **training_config)
 
 "Compute results on test data"
 outputs_dic = model.analyse(data_info)
@@ -55,17 +54,18 @@ outputs_dic = model.analyse(data_info)
 # -------------------------------------- Evaluate Scores --------------------------------------
 
 "Evaluate scores on the resulting models. Note X_test is converted back to input dimensions."
-scores = evaluate(**outputs_dic, data_info=data_info, avg=None)
+# scores = evaluate(**outputs_dic, data_info=data_info, avg=None)
 
 # ------------------------ Results Visualisations --------------------------
 "Learnt Group averages"
 
 # Get original data subsetted only to test set
-vis_main.visualise_cluster_groups(**outputs_dic, data_info=data_info)
-#
+# vis_main.visualise_cluster_groups(**outputs_dic, data_info=data_info)
+
 # "Losses where relevant"
-# axes_loss = plot_losses(**outputs_dic)
-#
+# vis_main.plot_losses(data_name=data_name, history=history, **outputs_dic)
+
 # "Clus assignments where relevant"
-#
+vis_main.visualise_cluster_assignment(**outputs_dic, data_info=data_info)
+
 # "Attention maps where relevant"
