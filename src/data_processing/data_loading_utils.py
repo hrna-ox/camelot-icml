@@ -25,8 +25,55 @@ MIMIC_VITALS = ["TEMP", "HR", "RR", "SPO2", "SBP", "DBP"]
 MIMIC_STATIC = ["age", "gender", "ESI"]
 MIMIC_OUTCOME_NAMES = ["De", "I", "W", "Di"]
 
+MAIN_ID_LIST = ["subject_id", "hadm_id", "stay_id", "patient_id", "pat_id"]  # Identifiers for main ids.
+
 # ----------------------------------------------------------------------------------------
 "Useful functions to define"
+
+
+def _is_id_feat(feat):
+    """
+    Boolean indicator to identify if feature is a key identifier in data or not.
+
+    Params:
+    - feat: str, name of feature.
+
+    Returns:
+        - bool, indicates if feature is used as identifier in processing.
+    """
+    is_id = feat in HAVEN_PARSE_TIME_VARS + MIMIC_PARSE_TIME_VARS + MIMIC_PARSE_TD_VARS + MAIN_ID_LIST
+
+    return is_id
+
+
+def _is_static_feat(feat):
+    """
+    Boolean indicator to identify if feature is a static variable in data or not.
+
+    Params:
+    - feat: str, name of feature.
+
+    Returns:
+        - bool, indicates if feature is a static biomedical variable.
+    """
+    is_static = feat in HAVEN_STATIC + MIMIC_STATIC
+
+    return is_static
+
+
+def _is_temporal_feat(feat):
+    """
+    Boolean indicator to identify if feature is temporal or not.
+
+    Params:
+    - feat: str, name of feature.
+
+    Returns:
+        - bool, indicates if feat is a biomedical variable which varies over time.
+    """
+    is_time_feat = feat in HAVEN_VITALS + HAVEN_SERUM + HAVEN_BIOCHEM + MIMIC_VITALS
+
+    return is_time_feat
 
 
 def convert_datetime_to_hour(series):
@@ -355,10 +402,10 @@ class DataProcessor:
         x_subset, features = self.subset_to_features(x_inter)
 
         # Convert to 3D array
-        x_3D, pat_time_ids = self.convert_to_3darray(x_subset)
+        x_inter, pat_time_ids = self.convert_to_3darray(x_subset)
 
         # Normalise array
-        x_inter = self.normalise(x_3D)
+        x_inter = self.normalise(x_inter)
 
         # Impute missing values
         x_out, mask = impute(x_inter)
@@ -371,7 +418,7 @@ class DataProcessor:
         # Check data loaded correctly
         _check_input_format(x_out, y_out)
 
-        return x_out, y_out, mask, pat_time_ids, features, outcomes, x_subset, x_3D, y_data
+        return x_out, y_out, mask, pat_time_ids, features, outcomes, x_subset, y_data
 
     def _add_time_to_end(self, X):
         """Add new column to dataframe - this computes time to end of grouped observations, if needed."""
@@ -381,7 +428,7 @@ class DataProcessor:
         if self.needs_time_to_end_computation is True:
 
             # Compute datetime values for time until end of group of observations
-            times = X.groupby(self.id_col).apply(lambda x: x.loc[:, self.time_col].max() - x.loc[:, self.time_col])
+            times = X.groupby(self.id_col).apply(lambda x: x.loc[:, self.time_col].norm_max() - x.loc[:, self.time_col])
 
             # add column to dataframe after converting to hourly times.
             x_inter["time_to_end"] = convert_datetime_to_hour(times).values
@@ -424,10 +471,10 @@ class DataProcessor:
         return X[features], features
 
     def convert_to_3darray(self, X):
-        """Convert a pandas dataframe to 3D numpy array of shape (num_samples, num_timesteps, num_variables)."""
+        """Convert a pandas dataframe to 3D numpy array of shape (num_samples, num_timestamps, num_variables)."""
 
         # Obtain relevant shape sizes
-        max_time_length = X.groupby(self.id_col).count()["time_to_end"].max()
+        max_time_length = X.groupby(self.id_col).count()["time_to_end"].norm_max()
         num_ids = X[self.id_col].nunique()
 
         # Other basic definitions

@@ -244,7 +244,7 @@ if __name__ == '__main__':
 
 
 
-        M          = int(tr_data_x.shape[0]/mb_size) #for evaluate.py algorithm
+        M          = int(tr_data_x.shape[0]/mb_size) #for main.py algorithm
         keep_prob  = args.keep_prob
         lr_rate1   = args.lr_rate_clu_1
         lr_rate2   = args.lr_rate_clu_2

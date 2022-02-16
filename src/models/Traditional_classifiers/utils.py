@@ -155,7 +155,7 @@ class data_processor():
 
         # Compute datetime values for time until end of group of observations
         times = X.groupby(self.id_col).apply(lambda x:
-                    x.loc[:, self.time_col].max() - x.loc[:, self.time_col])
+                    x.loc[:, self.time_col].norm_max() - x.loc[:, self.time_col])
 
         # add column to dataframe after converting to hourly times.
         x_inter["time_to_end"] = _convert_datetime_to_hour(times).values

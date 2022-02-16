@@ -120,7 +120,7 @@ def load_from_csv(folder_path, data_name, time_range = (0, 3), features = 'vital
         print('Computing time to outcome')
         
         # Compute time to outcome
-        X['time_to_outcome'] = X.groupby('subject_id').apply(lambda x: x['charttime'].max() - x['charttime']).values
+        X['time_to_outcome'] = X.groupby('subject_id').apply(lambda x: x['charttime'].norm_max() - x['charttime']).values
         X.sort_values(by = ['subject_id', 'time_to_outcome'], ascending = [True, False], inplace = True)
         
     assert X.subject_id.is_monotonic

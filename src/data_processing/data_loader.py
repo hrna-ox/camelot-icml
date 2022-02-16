@@ -36,7 +36,7 @@ def data_loader(data_name: str = "MIMIC", feat_set: Union[List, str] = "vit", ti
                                               target_window=target_window)
 
     # Convert to input format, and keep track of useful information
-    x, y, mask, ids, feats, outcomes, X_feat, X_feat_3D, y_outc = data_processor.load_transform()
+    x, y, mask, ids, feats, outcomes, X_feat, y_outc = data_processor.load_transform()
     print(f"{data_name} data successfully loaded.")
     print(f"Basic information \n",
           f"Input shape: {x.shape}, {y.shape} \n Outcome Distribution: {y_outc.sum(axis=0)}")
@@ -58,8 +58,8 @@ def data_loader(data_name: str = "MIMIC", feat_set: Union[List, str] = "vit", ti
     min_, max_ = data_processor.min, data_processor.max
 
     # Get data_config
-    data_config = {"data_name": data_name, "feat_set": feat_set, "time_range (h)": time_range, "window": 4,
-                   "train-test-ratio": train_test_ratio, "train-val-ratio": train_val_ratio, "seed": seed}
+    data_config = {"data_name": data_name, "feat_set": feat_set, "time_range (h)": time_range, "target_window": 4,
+                   "train_test_ratio": train_test_ratio, "train_val_ratio": train_val_ratio, "seed": seed}
 
     # Aggregate into output
     output = {"X": (X_train, X_val, X_test),
@@ -74,7 +74,6 @@ def data_loader(data_name: str = "MIMIC", feat_set: Union[List, str] = "vit", ti
               "outcomes": outcomes,
               "X_og": X_feat,
               "y_og": y_outc,
-              "X_og_3D": X_feat_3D,
               "data_load_config": data_config
               }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-File to evaluate.py results performance.
+File to main.py results performance.
 
 Includes evaluation based on predicted outcomes and cluster scores, if available.
 
