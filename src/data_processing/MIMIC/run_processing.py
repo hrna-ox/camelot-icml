@@ -12,20 +12,19 @@ import src.data_processing.MIMIC.outcomes_processing as outcomes_processing
 
 print("Current Directory: ", os.getcwd())
 
+
 def main():
-
-
     # Run admissions if not processed
     if not os.path.exists("data/MIMIC/interim/admissions_intermediate.csv"):
-    	admissions_processing.main()
+        admissions_processing.main()
 
     # Run vitals
     if not os.path.exists("data/MIMIC/interim/vitals_intermediate.csv"):
-    	vitals_processing.main()
+        vitals_processing.main()
 
     # Run outcomes
     if not os.path.exists("data/MIMIC/interim/vitals_final.csv"):
-    	outcomes_processing.main()
+        outcomes_processing.main()
 
     pass
 

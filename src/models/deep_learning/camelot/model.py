@@ -131,7 +131,7 @@ class CAMELOT(tf.keras.Model):
 
         super().build(input_shape)
 
-    def call(self, inputs):
+    def call(self, inputs, **kwargs):
         """
         Call method for model.
 
@@ -658,11 +658,11 @@ class Model(CAMELOT):
 
         # Main Training phase
         print("-" * 20, "\n", "STARTING MAIN TRAINING PHASE")
-        callbacks, run_num = model_utils.get_callbacks((X_val, y_val), track_loss="L1", other_cbcks=cbck_str,
+        callbacks, run_num = model_utils.get_callbacks((X_val, y_val), track_loss="L_pred", other_cbcks=cbck_str,
                                                        early_stop=True, lr_scheduler=True, tensorboard=True)
         self.run_num = run_num
         self.fit(x=X_train, y=y_train, validation_data=(X_val, y_val), batch_size=bs, epochs=epochs,
-                 verbose=1, callbacks=callbacks, **kwargs)
+                 verbose=2, callbacks=callbacks, **kwargs)
 
     def analyse(self, data_info):
         """
@@ -671,13 +671,15 @@ class Model(CAMELOT):
         Params:
         - data_info: dictionary with data information.
 
-        Returns: - y_pred: dataframe of shape (N, output_dim) with outcome probability prediction. - outc_pred:
-        Series of shape (N, ) with predicted outcome based on most likely outcome prediction. - y_true: dataframe of
-        shape (N, output_dim) ith one-hot encoded true outcome. - pis_pred: dataframe of shape (N, K) of cluster
-        probability assignment. - clus_pred: Series of shape (N, ) with cluster assignment based on most likely
-        cluster probability. - clus_representations: Numpy array of shape (K, latent_dim) with corresponding luster
-        representation vectors. - clus_phenotypes: DataFrame of shape (K, output_dim) with predicted cluster outcome
-        probability.
+        Returns:
+            - y_pred: dataframe of shape (N, output_dim) with outcome probability prediction.
+            - outc_pred: Series of shape (N, ) with predicted outcome based on most likely outcome prediction.
+            - y_true: dataframe of shape (N, output_dim) ith one-hot encoded true outcome.
+            - pis_pred: dataframe of shape (N, K) of cluster probability assignment.
+            - clus_pred: Series of shape (N, ) with cluster assignment based on most likely cluster probability.
+            - clus_representations: Numpy array of shape (K, latent_dim) with corresponding luster representation
+            vectors.
+            - clus_phenotypes: DataFrame of shape (K, output_dim) with predicted cluster outcome probability.
 
         Saves a variety of model information, as well.
         """
@@ -685,11 +687,12 @@ class Model(CAMELOT):
         # Unpack test data
         _, _, X_test = data_info["X"]
         _, _, y_test = data_info["y"]
+        data_properties = data_info["data_properties"]
 
         # Source outcome names and patient id info
         id_info = data_info["ids"][-1]
         pat_ids = id_info[:, 0, 0]
-        outc_dims = data_info["outcomes"]
+        outc_dims = data_properties["outc_names"]
         save_fd = f"results/{self.model_name}/run{self.run_num}/"
         track_fd = f"experiments/{self.model_name}/run{self.run_num}/"
 
@@ -731,24 +734,24 @@ class Model(CAMELOT):
         pis_pred.to_csv(save_fd + "pis_pred.csv", index=True, header=True)
         clus_pred.to_csv(save_fd + "clus_pred.csv", index=True, header=True)
         clus_phenotypes.to_csv(save_fd + "clus_phenotypes.csv", index=True, header=True)
-        np.save(save_fd + "cluster_representations.npy", cluster_rep_set, allow_pickle=True)
+        np.save(save_fd + "cluster_representations", cluster_rep_set, allow_pickle=True)
 
         # save init losses
         init_loss_1.to_csv(track_fd + "enc_pred_init_loss.csv", index=True, header=True)
         init_loss_2.to_csv(track_fd + "iden_init_loss.csv", index=True, header=True)
 
         # Save attention weights
-        np.savez(save_fd + "unnorm_weights.npy", alpha=alpha, beta=beta, gamma=gamma)
-        np.savez(save_fd + "norm_weights.npy", alpha=alpha_norm, beta=beta_norm, gamma=gamma_norm)
+        np.savez(save_fd + "unnorm_weights", alpha=alpha, beta=beta, gamma=gamma)
+        np.savez(save_fd + "norm_weights", alpha=alpha_norm, beta=beta_norm, gamma=gamma_norm)
 
         # save model parameters
         save_params = {**data_info["data_load_config"], **self.model_config, **self.training_params}
         with open(save_fd + "config.json", "w+") as f:
-            json.dump(save_params, f)
+            json.dump(save_params, f, indent=4)
             f.close()
 
         with open(track_fd + "config.json", "w+") as f:
-            json.dump(save_params, f)
+            json.dump(save_params, f, indent=4)
             f.close()
 
         # Return objects
@@ -756,7 +759,7 @@ class Model(CAMELOT):
             "y_pred": y_pred, "class_pred": outc_pred, "y_true": y_true, "pis_pred": pis_pred, "clus_pred": clus_pred,
             "clus_representations": cluster_rep_set, "clus_phenotypes": clus_phenotypes, "init_loss_1": init_loss_1,
             "init_loss_2": init_loss_2, "attention_unnorm": (alpha, beta, gamma),
-            "attention_norm": (alpha_norm, beta_norm, gamma_norm), "save_fd": save_fd
+            "attention_norm": (alpha_norm, beta_norm, gamma_norm), "save_fd": save_fd, "model_config": self.model_config
         }
 
         # Print Data

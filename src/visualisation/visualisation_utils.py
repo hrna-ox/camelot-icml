@@ -24,25 +24,6 @@ with open("data/MIMIC/processed/units_dic.json", "r") as f:
     f.close()
 
 
-def _convert_timedelta_to_hours(td_array):
-    """
-    Convert time delta array to hours.
-
-    Params:
-    - time_index: pd.Index or pd Series of type timedelta.
-
-    Returns:
-        - Series of same type with corresponding hour values.
-    """
-    try:
-        hours_array = td_array.dt.total_seconds() // 3600
-
-    except AttributeError:
-        hours_array = td_array.to_series().dt.total_seconds() // 3600
-
-    return hours_array.values
-
-
 def separate_vars_by_type(feats: List) -> Tuple[List, List, List]:
     """
     Separate features into id features, time variables and static variables.
@@ -138,10 +119,10 @@ def make_summary_statistics(group_data_dic: Union[pd.DataFrame, dict], feats: Un
         group_data_dic = dict(all_cohort=group_data_dic)
 
     # Useful definition
-    groups = group_data_dic.keys()
+    groups = list(group_data_dic.keys())
 
     # Initialise output array
-    output = pd.DataFrame(np.zeros(len(groups)), columns=groups)
+    output = pd.DataFrame(np.empty(shape=(1, len(groups))), columns=groups)
 
     # Iterate over features
     for feat in feats:
@@ -227,16 +208,15 @@ def make_temporal_trajs(group_data_dic, feats, id_col, time_col, ax=None):
 
         # Iterate through each group
         for group_id, (group, group_data) in enumerate(group_data_dic.items()):
+            # Group properties
             group_color = colors[group_id]
+            group_label = f"{group} - (N = {group_data[id_col].nunique()})"
 
             # Compute mean and sterror trajectories
             time_ids, feat_mean = _compute_mean(group_data, time_col=time_col, feat=feat)
             _, feat_sterror = _compute_sterror(group_data, time_col=time_col, id_col=id_col, feat=feat)
 
-            # Convert time ids to hour
-            time_ids = _convert_timedelta_to_hours(time_ids)
-
-            axes[feat_id].plot(time_ids, feat_mean, linestyle="-", color=group_color, label=group)
+            axes[feat_id].plot(time_ids, feat_mean, linestyle="-", color=group_color, label=group_label)
             axes[feat_id].plot(time_ids, feat_mean + feat_sterror, linestyle="--", color=group_color)
             axes[feat_id].plot(time_ids, feat_mean - feat_sterror, linestyle="--", color=group_color)
 
@@ -249,6 +229,10 @@ def make_temporal_trajs(group_data_dic, feats, id_col, time_col, ax=None):
             unit = "-"
 
         axes[feat_id].set_ylabel(f"{feat} {unit}")
+
+    # Invert axes and add legend
+    axes[0].invert_xaxis()
+    axes[0].legend()
 
     return axes
 

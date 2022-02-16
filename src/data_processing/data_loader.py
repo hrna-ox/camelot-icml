@@ -37,8 +37,8 @@ def data_loader(data_name: str = "MIMIC", feat_set: Union[List, str] = "vit", ti
 
     # Convert to input format, and keep track of useful information
     x, y, mask, ids, feats, outcomes, X_feat, y_outc = data_processor.load_transform()
-    print(f"{data_name} data successfully loaded.")
-    print(f"Basic information \n",
+    print(f"\n{data_name} data successfully loaded.")
+    print(f"\nBasic information \n",
           f"Input shape: {x.shape}, {y.shape} \n Outcome Distribution: {y_outc.sum(axis=0)}")
 
     # Separate into train, val and test data
@@ -60,20 +60,16 @@ def data_loader(data_name: str = "MIMIC", feat_set: Union[List, str] = "vit", ti
     # Get data_config
     data_config = {"data_name": data_name, "feat_set": feat_set, "time_range (h)": time_range, "target_window": 4,
                    "train_test_ratio": train_test_ratio, "train_val_ratio": train_val_ratio, "seed": seed}
+    data_properties = {"feats": feats, "id_col": data_processor.id_col, "time_col": data_processor.time_col,
+                       "norm_min": min_, "norm_max": max_, "outc_names": outcomes}
 
     # Aggregate into output
-    output = {"X": (X_train, X_val, X_test),
+    output = {"data_og": (X_feat, y_outc),
+              "X": (X_train, X_val, X_test),
               "y": (y_train, y_val, y_test),
               "ids": (id_train, id_val, id_test),
               "mask": (mask_train, mask_val, mask_test),
-              "feats": feats,
-              "id_col": data_processor.id_col,
-              "time_col": data_processor.time_col,
-              "norm_min": min_,
-              "norm_max": max_,
-              "outcomes": outcomes,
-              "X_og": X_feat,
-              "y_og": y_outc,
+              "data_properties": data_properties,
               "data_load_config": data_config
               }
 

@@ -9,10 +9,11 @@ Includes evaluation based on predicted outcomes and cluster scores, if available
 email: henrique.aguiar@eng.ox.ac.uk
 """
 from csv import writer
+import pandas as pd
 import src.results.results_utils as utils
 
 
-def evaluate(y_true, y_pred, clus_pred=None, X_og_3D=None, save_fd=None, avg=None,
+def evaluate(y_true, y_pred, clus_pred=None, data_info=None, save_fd=None, avg=None,
              **kwargs):
     """
     Evaluate function to print result information given results and/or experiment ids. Returns a dictionary of scores
@@ -22,7 +23,7 @@ def evaluate(y_true, y_pred, clus_pred=None, X_og_3D=None, save_fd=None, avg=Non
     - y_true: array-like of shape (N, num_outcs) with one-hot encodings of true class membership.
     - y_pred: array-like of shape (N, num_outcs) with predicted outcome likelihood assignments.
     - clus_pred: array-like of shape (N, num_clus) with predicted cluster membership probabilities. default to None
-    - X_og_3D: array-like of shape (N, T, D_f) of input array data.
+    - data_info: dict of input data information and objects.
     - save_fd: str, folder where to write scores to.
     - age: str, useful how to average class individual scores (defaults to None, which returns no average).
     - **kwargs: other parameters given to scoring supervised scores.
@@ -34,22 +35,38 @@ def evaluate(y_true, y_pred, clus_pred=None, X_og_3D=None, save_fd=None, avg=Non
         - saves score information in relevant folder.
     """
 
+    # Checks for instances Df vs array and loads data properties
+    if isinstance(y_true, pd.DataFrame):
+        y_true = y_true.values
+
+    if isinstance(y_pred, pd.DataFrame):
+        y_pred = y_pred.values
+
+    data_properties = data_info["data_properties"]
+
     # Compute outcome related scores
     scores = utils.compute_scores(y_true, y_pred, avg=avg)
 
     # If clustering results exist, output cluster performance scores
     clus_metrics = {}
-    if clus_pred:  # clus_pred is not None
+    if clus_pred is not None:
+
+        if isinstance(clus_pred, pd.DataFrame):
+            clus_pred = clus_pred.values
+
+        # Compute X_test in 3 dimensional format
+        min_, max_ = data_properties["norm_min"], data_properties["norm_max"]
+        x_test_3d = data_info["X"][-1] * (max_ - min_) + min_
 
         # Compute metrics
-        clus_metrics = utils.compute_cluster_performance(X_og_3D, clus_pred=clus_pred, y_true=y_true)
+        clus_metrics = utils.compute_cluster_performance(x_test_3d, clus_pred=clus_pred, y_true=y_true)
 
     # Jointly compute scores
     scores = {**scores, **clus_metrics}
 
     # Save
-    with open(save_fd + "scores.csv", "w+") as f:
-        csv_writer = writer(f, delimiter=",", newline="\n")
+    with open(save_fd + "scores.csv", "w+", newline="\n") as f:
+        csv_writer = writer(f, delimiter=",")
 
         # Iterate through score key and score value(s)
         for key, value in scores.items():

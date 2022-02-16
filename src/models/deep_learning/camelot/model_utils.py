@@ -162,7 +162,7 @@ class CEClusSeparation(cbck.Callback):
         else:
             self.weights = np.ones(shape=(self.y_val.get_shape()[0]))
 
-    def on_epoch_end(self, epoch, **kwargs):
+    def on_epoch_end(self, epoch, *args, **kwargs):
 
         # Print information if matches interval epoch length
         if epoch % self.interval == 0:
@@ -202,7 +202,7 @@ class ConfusionMatrix(cbck.Callback):
         # Compute number of outcomes
         self.C = self.y_val.shape[-1]
 
-    def on_epoch_end(self, epoch, **kwargs):
+    def on_epoch_end(self, epoch, *args, **kwargs):
 
         # Print information if matches interval epoch length
         if epoch % self.interval == 0:
@@ -216,14 +216,14 @@ class ConfusionMatrix(cbck.Callback):
             class_true = np.argmax(self.y_val, axis=-1)
 
             # Iterate through classes
-            for true_class in range(self.num_outcs):
-                for pred_class in range(self.num_outcs):
+            for true_class in range(self.C):
+                for pred_class in range(self.C):
                     num_samples = np.logical_and(class_pred == pred_class, class_true == true_class).sum()
                     cm_output[true_class, pred_class] = num_samples
 
             # Print as pd.dataframe
             index = [f"TC{class_}" for class_ in range(1, self.C + 1)]
-            columns = index
+            columns = [f"PC{class_}" for class_ in range(1, self.C + 1)]
 
             cm_output = pd.DataFrame(cm_output, index=index, columns=columns)
 
@@ -244,7 +244,7 @@ class AUROC(cbck.Callback):
         self.interval = interval
         self.X_val, self.y_val = validation_data
 
-    def on_epoch_end(self, epoch, **kwargs):
+    def on_epoch_end(self, epoch, *args, **kwargs):
         if epoch % self.interval == 0:
             # Compute predictions
             y_pred = self.model(self.X_val).numpy()
@@ -270,7 +270,7 @@ class PrintClusterInfo(cbck.Callback):
         self.interval = interval
         self.X_val, self.y_val = validation_data
 
-    def on_epoch_end(self, epoch, **kwargs):
+    def on_epoch_end(self, epoch, *args, **kwargs):
         if epoch % self.interval == 0:
 
             # Compute cluster_predictions
@@ -307,7 +307,7 @@ class SupervisedTargetMetrics(cbck.Callback):
         self.interval = interval
         self.X_val, self.y_val = validation_data
 
-    def on_epoch_end(self, epoch, **kwargs):
+    def on_epoch_end(self, epoch, *args, **kwargs):
         if epoch % self.interval == 0:
             # Compute y_pred, y_true in categorical format.
             model_output = (self.model(self.X_val)).numpy()
@@ -336,7 +336,7 @@ class UnsupervisedTargetMetrics(cbck.Callback):
         self.interval = interval
         self.X_val, self.y_val = validation_data
 
-    def on_epoch_end(self, epoch, **kwargs):
+    def on_epoch_end(self, epoch, *args, **kwargs):
         if epoch % self.interval == 0:
             # Compute predictions and latent representations
             latent_reps = self.model.Encoder(self.X_val)
@@ -429,6 +429,7 @@ def get_callbacks(validation_data, track_loss: str, interval: int = 5, other_cbc
 
     os.makedirs(save_fd)
     os.makedirs(save_fd + "logs/")
+    os.makedirs(save_fd + "training/")
 
     # ------------------ Start Loading callbacks ---------------------------
 

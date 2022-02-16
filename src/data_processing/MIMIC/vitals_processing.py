@@ -43,9 +43,9 @@ VITALS_NAMING_DIC = {"temperature": "TEMP", "heartrate": "HR", "resprate": "RR",
                      "o2sat": "SPO2", "sbp": "SBP", "dbp": "DBP"}
 
 admission_min_count = 3
-vitals_na_threshold = 0.6
+vitals_na_threshold = 0.5
 resampling_rule = "1H"
-admission_min_time_to_outtime = 1.5
+admission_min_time_to_outtime = 5
 
 
 def main():
@@ -125,6 +125,11 @@ def main():
 	# Ensure blocks satisfy conditions - min counts, proportion of missingness AND time to final outcome
 	vitals_S5 = utils.remove_adms_high_missingness(vitals_S4, vital_feats, "stay_id",
 		                                     min_count=admission_min_count, min_frac=vitals_na_threshold)
+
+
+	"""
+	Consider those admissions with observations with at most an observations 1.5 hours before outtime 
+	"""
 	vitals_S5 = vitals_S5[vitals_S5["time_to_end_min"].dt.total_seconds() <= admission_min_time_to_outtime * 3600]
 	vitals_S5.to_csv(SAVE_FD + "vitals_intermediate.csv", index=True, header=True)
 

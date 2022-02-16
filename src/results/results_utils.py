@@ -26,7 +26,7 @@ def get_clus_outc_numbers(y_true: np.ndarray, clus_pred: np.ndarray):
 
     Params:
     - y_true: array-like of true outcome one-hot assignments.
-    - clus_pred: array-like of predicted cluster assignment probabilities. Also works for predicted outcome assignments.
+    - clus_pred: array-like of cluster label assignments.
 
     Returns:
         - cont_matrix: numpy ndarray of shape (num_outcs, num_clus) where entry (i,j) denotes the number of patients
@@ -35,7 +35,7 @@ def get_clus_outc_numbers(y_true: np.ndarray, clus_pred: np.ndarray):
 
     # Convert to categorical
     labels_true = np.argmax(y_true, axis=1)
-    labels_pred = np.argmax(clus_pred, axis=1)
+    labels_pred = clus_pred
 
     # Compute contingency matrix
     cont_matrix = contingency_matrix(labels_true, labels_pred)
@@ -85,10 +85,18 @@ def _convert_to_one_hot_from_probs(array_pred: Union[np.ndarray, pd.DataFrame]):
         array_pred = array_pred.values
 
     # Compute dimensionality
-    _, K = array_pred.shape
+    if len(array_pred.shape) == 2:
+        _, K = array_pred.shape
 
-    # Convert to categorical
-    class_pred = np.eye(K)[np.argmax(array_pred, axis=1)]
+        # Convert to categorical
+        class_pred = np.eye(K)[np.argmax(array_pred, axis=1)]
+
+    else:
+        # Array_pred already categorical
+        K = array_pred.size
+
+        # Convert to categorical
+        class_pred = np.eye(K)[array_pred]
 
     return class_pred
 
@@ -108,7 +116,7 @@ def purity(y_true: np.ndarray, clus_pred: np.ndarray) -> float:
     """
 
     # Convert clus_pred to categorical cluster assignments
-    confusion_matrix = _get_clus_outc_numbers(y_true, clus_pred)    # shape (num_outcs, num_clus)
+    confusion_matrix = get_clus_outc_numbers(y_true, clus_pred)    # shape (num_outcs, num_clus)
 
     # Number of most common class in each cluster
     max_class_numbers = np.amax(confusion_matrix, axis=0)
@@ -183,7 +191,7 @@ def compute_cluster_performance(X, clus_pred, y_true):
     Params:
     - X: array-like of shape (N, T, D_f) where N is the number of patients, T the number of time steps and D_f the
     number of features (+2, the id col and the time col).
-    - clus_pred: array-like of shape (N, num_clus) with probability predictions for cluster assignment.
+    - clus_pred: array-like of shape (N, ) with predicted label assignments.
     - y_true: array-like of shape (N, num_outcs) with one-hot encoding of true class assignments.
 
     Returns:
@@ -194,8 +202,9 @@ def compute_cluster_performance(X, clus_pred, y_true):
             - "Purity": Purity Score computation.
     """
 
-    # Convert to one-hot encoding from probabilities.
-    clus_pred = _convert_to_one_hot_from_probs(array_pred=clus_pred)
+    # If not converted to categorical, then convert
+    if len(clus_pred.shape) == 2:
+        clus_pred = np.argmax(clus_pred, axis=1)
 
     # Compute the same taking average over each feature dimension
     sil_avg, dbi_avg, vri_avg = 0, 0, 0

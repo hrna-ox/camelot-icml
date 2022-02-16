@@ -19,9 +19,9 @@ tqdm.pandas()
 def _compute_last_target_id(df: pd.DataFrame, time_col: str = "intime", mode: str = "max") -> pd.DataFrame:
     """Identify last ids given df according to time given by time_col column. Mode determines min or max."""
     if mode == "max":
-        time = df[time_col].norm_max()
+        time = df[time_col].max()
     elif mode == "min":
-        time = df[time_col].norm_min()
+        time = df[time_col].min()
     else:
         raise ValueError("mode must be one of ['min', 'max']. Got {}".format(mode))
 
@@ -56,7 +56,7 @@ def _compute_second_transfer_info(df: pd.DataFrame, time_col, target_cols):
     return: pd.Series with corresponding second transfer info.
     """
     time_info = df[time_col]
-    second_transfer_time = time_info[time_info != time_info.norm_min()].norm_min()
+    second_transfer_time = time_info[time_info != time_info.min()].min()
 
     # Identify second transfer info - can be empty, unique, or repeated instances
     second_transfer = df[df[time_col] == second_transfer_time]
@@ -188,8 +188,8 @@ def _resample_adm(df: pd.DataFrame, rule: str, time_id: str,
 
     # Compute static ids manually and add information about max and min time id values
     output[static_vars] = df[static_vars].iloc[0, :].values
-    output[time_id + "_min"] = df[time_id].norm_min()
-    output[time_id + "_max"] = df[time_id].norm_max()
+    output[time_id + "_min"] = df[time_id].min()
+    output[time_id + "_max"] = df[time_id].max()
 
     # Reset index to obtain resampled values
     output.index.name = f"sampled_time_to_end({rule})"
@@ -279,13 +279,13 @@ def select_death_icu_acute(df, admissions_df, timedt):
 
     # Identify Last observed vitals for corresponding admission
     hadm_information = admissions_df.query("hadm_id==@df.name").iloc[0, :]
-    max_vitals_obvs = hadm_information.loc["outtime"]
+    window_start_point = hadm_information.loc["intime"]
 
     # First check if death exists
     hadm_information = admissions_df.query("hadm_id==@df.name")
     if not hadm_information.empty and not hadm_information.dod.isna().all():
-        time_of_death = hadm_information.dod.norm_min()
-        time_from_vitals = (time_of_death - max_vitals_obvs)
+        time_of_death = hadm_information.dod.min()
+        time_from_start_point = (time_of_death - window_start_point)
 
         # try:
         #     assert time_from_vitals >= dt.timedelta(seconds=0)
@@ -294,11 +294,11 @@ def select_death_icu_acute(df, admissions_df, timedt):
         #     return pd.Series(data=[0, 0, 0, 0, time_of_death], index=["De", "I", "W", "Di", "time"])
 
         # Check death within time window
-        if time_from_vitals < timedt:
-            return pd.Series(data=[1, 0, 0, 0, time_of_death], index=["De", "I", "W", "Di", "time"])
+        if time_from_start_point < timedt:
+            return pd.Series(data=[1, 0, 0, time_of_death], index=["De+I", "W", "Di", "time"])
 
     # Otherwise, consider other transfers
-    transfers_within_window = df[df["intime"].between(max_vitals_obvs, max_vitals_obvs + timedt)]
+    transfers_within_window = df[df["intime"].between(window_start_point, window_start_point + timedt)]
 
     # Consider icu transfers within window
     icu_cond1 = transfers_within_window.careunit.str.contains("(?i)ICU", na=False)  # regex ignore lowercase
@@ -307,16 +307,16 @@ def select_death_icu_acute(df, admissions_df, timedt):
 
     if has_icus.sum() > 0:
         icu_transfers = transfers_within_window[has_icus]
-        return pd.Series(data=[0, 1, 0, 0, icu_transfers.intime.norm_min()],
-                         index=["De", "I", "W", "Di", "time"])
+        return pd.Series(data=[1, 0, 0, icu_transfers.intime.min()],
+                         index=["De+I", "W", "Di", "time"])
 
     # Check to see if discharge has taken
     discharges = transfers_within_window.eventtype.str.contains("discharge", na=False)
     if discharges.sum() > 0:
-        return pd.Series(data=[0, 0, 0, 1, transfers_within_window[discharges].intime.norm_min()],
-                         index=["De", "I", "W", "Di", "time"]
+        return pd.Series(data=[0, 0, 1, transfers_within_window[discharges].intime.min()],
+                         index=["De+I", "W", "Di", "time"]
                          )
     else:
-        return pd.Series(data=[0, 0, 1, 0, transfers_within_window.intime.norm_min()],
-                         index=["De", "I", "W", "Di", "time"]
+        return pd.Series(data=[0, 1, 0, transfers_within_window.intime.min()],
+                         index=["De+I", "W", "Di", "time"]
                          )

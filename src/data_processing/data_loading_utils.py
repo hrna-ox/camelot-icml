@@ -23,7 +23,7 @@ MIMIC_PARSE_TIME_VARS = ["intime", "outtime", "chartmax"]
 MIMIC_PARSE_TD_VARS = ["sampled_time_to_end(1H)", "time_to_end", "time_to_end_min", "time_to_end_max"]
 MIMIC_VITALS = ["TEMP", "HR", "RR", "SPO2", "SBP", "DBP"]
 MIMIC_STATIC = ["age", "gender", "ESI"]
-MIMIC_OUTCOME_NAMES = ["De", "I", "W", "Di"]
+MIMIC_OUTCOME_NAMES = ["De+I", "W", "Di"]
 
 MAIN_ID_LIST = ["subject_id", "hadm_id", "stay_id", "patient_id", "pat_id"]  # Identifiers for main ids.
 
@@ -41,9 +41,10 @@ def _is_id_feat(feat):
     Returns:
         - bool, indicates if feature is used as identifier in processing.
     """
-    is_id = feat in HAVEN_PARSE_TIME_VARS + MIMIC_PARSE_TIME_VARS + MIMIC_PARSE_TD_VARS + MAIN_ID_LIST
+    is_id_1 = feat in HAVEN_PARSE_TIME_VARS + MIMIC_PARSE_TIME_VARS + MIMIC_PARSE_TD_VARS + MAIN_ID_LIST
+    is_id_2 = "time_to_end" in feat
 
-    return is_id
+    return is_id_1 or is_id_2
 
 
 def _is_static_feat(feat):
@@ -131,7 +132,7 @@ def _get_features(key, data_name="HAVEN"):
             features = _get_features("vit-lab-sta", data_name)
 
         sorted_features = sorted(features)  # sorted returns a list of features.
-        print(f"{data_name} data has been subsettted to the following features: \n {sorted_features}.")
+        print(f"\n{data_name} data has been subsettted to the following features: \n {sorted_features}.")
 
         return sorted_features
 
@@ -240,7 +241,7 @@ def impute(X):
     return impute_step3, mask
 
 
-def get_ids(data_folder):
+def get_ids(data_name):
     """
     Get input id information.
 
@@ -251,23 +252,17 @@ def get_ids(data_folder):
         - Tuple of id col, time col and whether time to end needs computation.
     """
 
-    # Check Processed data folder exists
-    try:
-        assert os.path.exists(data_folder)
-    except AssertionError:
-        print(f"Folder does not Exist. Check data has been processed. Input to the load function is {data_folder}.")
-
-    if "HAVEN" in data_folder:
+    if "HAVEN" in data_name:
         id_col, time_col, needs_time_to_end = "subject_id", "charttime", True
 
-    elif "MIMIC" in data_folder:
+    elif "MIMIC" in data_name:
         id_col, time_col, needs_time_to_end = "hadm_id", "sampled_time_to_end(1H)", False
 
-    elif "SAMPLE" in data_folder:
+    elif "SAMPLE" in data_name:
         id_col, time_col, needs_time_to_end = None, None, None
 
     else:
-        raise ValueError(f"Data Name does not match available datasets. Input Folder provided {data_folder}")
+        raise ValueError(f"Data Name does not match available datasets. Input Folder provided {data_name}")
 
     return id_col, time_col, needs_time_to_end
 
@@ -318,7 +313,7 @@ def _subset_to_balanced(X, y, mask, ids):
     """Subset samples so dataset is more well sampled."""
     class_numbers = np.sum(y, axis=0)
     largest_class, target_num_samples = np.argmax(class_numbers), np.sort(class_numbers)[-2]
-    print("Subsetting class {} from {} to {} samples.".format(largest_class, class_numbers[largest_class],
+    print("\nSubsetting class {} from {} to {} samples.".format(largest_class, class_numbers[largest_class],
                                                               target_num_samples))
 
     # Select random
@@ -428,7 +423,7 @@ class DataProcessor:
         if self.needs_time_to_end_computation is True:
 
             # Compute datetime values for time until end of group of observations
-            times = X.groupby(self.id_col).apply(lambda x: x.loc[:, self.time_col].norm_max() - x.loc[:, self.time_col])
+            times = X.groupby(self.id_col).apply(lambda x: x.loc[:, self.time_col].max() - x.loc[:, self.time_col])
 
             # add column to dataframe after converting to hourly times.
             x_inter["time_to_end"] = convert_datetime_to_hour(times).values
@@ -438,6 +433,7 @@ class DataProcessor:
             x_inter["time_to_end"] = convert_datetime_to_hour(x_inter.loc[:, "time_to_end"])
 
         # Sort data
+        self.time_col = "time_to_end"
         x_out = x_inter.sort_values(by=[self.id_col, "time_to_end"], ascending=[True, False])
 
         return x_out
@@ -474,7 +470,7 @@ class DataProcessor:
         """Convert a pandas dataframe to 3D numpy array of shape (num_samples, num_timestamps, num_variables)."""
 
         # Obtain relevant shape sizes
-        max_time_length = X.groupby(self.id_col).count()["time_to_end"].norm_max()
+        max_time_length = X.groupby(self.id_col).count()["time_to_end"].max()
         num_ids = X[self.id_col].nunique()
 
         # Other basic definitions
