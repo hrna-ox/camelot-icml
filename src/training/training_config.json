@@ -1,7 +1,7 @@
 {
-   "lr": 0.001,
+   "lr": 0.01,
    "epochs_init": 10000,
    "epochs": 10000,
-   "bs": 128,
-   "cbck_str": "auc-sup_scores-cm-clus_sep"
+   "bs": 16,
+   "cbck_str": "auc-cm"
 }

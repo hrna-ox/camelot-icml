@@ -34,6 +34,9 @@ def evaluate(y_true, y_pred, clus_pred=None, data_info=None, save_fd=None, avg=N
         - prints information for each of the associated score.
         - saves score information in relevant folder.
     """
+    if "news" in save_fd.lower():
+        print("NEED TO ADD FUNCTIONS FOR NEWS 2")
+        return None
 
     # Checks for instances Df vs array and loads data properties
     if isinstance(y_true, pd.DataFrame):

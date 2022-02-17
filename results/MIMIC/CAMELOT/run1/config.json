@@ -1,0 +1,43 @@
+{
+    "data_name": "MIMIC",
+    "feat_set": "vit-sta",
+    "time_range (h)": [
+        0,
+        8
+    ],
+    "target_window": 4,
+    "train_test_ratio": 0.6,
+    "train_val_ratio": 0.4,
+    "seed": 2323,
+    "output_dim": 3,
+    "num_clusters": 8,
+    "latent_dim": 16,
+    "name": "CAMELOT",
+    "alpha": 0.0,
+    "beta": 2,
+    "regulariser_params": [
+        0.1,
+        0.1
+    ],
+    "dropout": 0.9,
+    "encoder_params": {
+        "hidden_layers": 0,
+        "hidden_nodes": 20
+    },
+    "identifier_params": {
+        "hidden_layers": 0,
+        "hidden_nodes": 30
+    },
+    "predictor_params": {
+        "hidden_layers": 1,
+        "hidden_nodes": 30
+    },
+    "cluster_rep_lr": 0.001,
+    "optimizer_init": "adam",
+    "weighted_loss": true,
+    "lr": 0.001,
+    "epochs_init": 10000,
+    "epochs": 10000,
+    "bs": 32,
+    "cbck_str": "auc-cm"
+}

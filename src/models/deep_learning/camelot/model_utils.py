@@ -346,7 +346,7 @@ class UnsupervisedTargetMetrics(cbck.Callback):
             clus_pred = np.argmax(model_output, axis=-1)
 
             # Reshape input data and allow feature comparison
-            X_val_2d = np.reshape(self.X_val, (self.X_val[0], -1))
+            X_val_2d = np.reshape(self.X_val, (self.X_val.shape[0], -1))
 
             # Compute metrics
             dbs = davies_bouldin_score(X_val_2d, labels=clus_pred)
@@ -393,13 +393,14 @@ def cbck_list(summary_name: str, interval: int = 5, validation_data: tuple = ())
     return extra_callback_list
 
 
-def get_callbacks(validation_data, track_loss: str, interval: int = 5, other_cbcks: str = "", early_stop: bool = True,
-                  lr_scheduler: bool = True, tensorboard: bool = True, min_delta: float = 0.0001, patience: int = 100):
+def get_callbacks(validation_data, data_name: str, track_loss: str, interval: int = 5, other_cbcks: str = "", early_stop: bool = True,
+                  lr_scheduler: bool = True, tensorboard: bool = True, min_delta: float = 0.0001, patience: int = 200):
     """
     Generate complete list of callbacks given input configuration.
 
     Params:
         - validation_data: tuple (X, y) of validation data.
+        - data_name: str, data name on which the model is running
         - track_loss: str, name of main.py loss to keep track of.
         - interval: int, interval to print information on.
         - other_cbcks: str, list of other callbacks to consider (default = "", which selects None).
@@ -420,11 +421,11 @@ def get_callbacks(validation_data, track_loss: str, interval: int = 5, other_cbc
 
     # Save Folder is first run that has not been previously computed
     run_num = 1
-    while os.path.exists(logs_dir + f"run{run_num}/"):
+    while os.path.exists(logs_dir + f"{data_name}/run{run_num}/"):
         run_num += 1
 
     # Save as new run
-    save_fd = logs_dir + f"run{run_num}/"
+    save_fd = logs_dir + f"{data_name}/run{run_num}/"
     assert not os.path.exists(save_fd)
 
     os.makedirs(save_fd)

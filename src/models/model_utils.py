@@ -6,17 +6,12 @@ Created on Sun Nov 21 10:48:57 2021
 @author: henrique.aguiar@ds.ccrg.kadooriecentre.org
 """
 
-"""
-SOME OF THESE ARE FOR EVALUATION.
-"""
-
-
-from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
-from sklearn.metrics import roc_auc_score, f1_score, recall_score
-import numpy as np
-from sklearn.metrics.cluster import contingency_matrix
-
 from src.models.deep_learning.camelot.model import Model as CamelotModel
+from src.models.traditional_classifiers.svm_all import SVMAll
+from src.models.traditional_classifiers.svm_per_feat import SVMFeat
+from src.models.traditional_classifiers.xgb_all import XGBAll
+from src.models.traditional_classifiers.xgb_per_feat import XGBFeat
+from src.models.traditional_clustering.TSKM import TSKM
 
 
 def get_model_from_str(model_name, **kwargs):
@@ -32,7 +27,22 @@ def get_model_from_str(model_name, **kwargs):
     if "camelot" in model_name.lower():
         model = CamelotModel(**kwargs)
 
+    elif "svm" in model_name.lower() and "all" in model_name.lower():
+        model = SVMAll(**kwargs)
+
+    elif "svm" in model_name.lower() and "feat" in model_name.lower():
+        model = SVMFeat(**kwargs)
+
+    elif "xgb" in model_name.lower() and "all" in model_name.lower():
+        model = XGBAll(**kwargs)
+
+    elif "xgb" in model_name.lower() and "feat" in model_name.lower():
+        model = XGBFeat(**kwargs)
+
+    elif "tskm" in model_name.lower():
+        model = TSKM(**kwargs)
+
     else:
-        raise ValueError(f"Correct Model name not specified. Value {model_str} given.")
+        raise ValueError(f"Correct Model name not specified. Value {model_name} given.")
 
     return model

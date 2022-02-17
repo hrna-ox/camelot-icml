@@ -1,201 +1,193 @@
-import src.models.benchmarks.Traditional_classifiers.utils as utils
+"""
+Define Model Class for SVM Feat model. Ensemble of SVMs is fit to each fit of the model.
+"""
+
+import os, json
+
+from sklearn.svm import SVC
+from scipy import stats
+
 import numpy as np
 import pandas as pd
 
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_auc_score, f1_score, recall_score, normalized_mutual_info_score
-
-from tqdm import tqdm
-import itertools
-
-from sklearn.svm import SVC
-np.set_printoptions(precision=3, suppress = True)
+SVMFEAT_INPUT_PARAMS = ["C", "kernel", "degree", "gamma", "coef0", "shrinking", "probability", "tol", "class_weight",
+                        "random_state", "verbose"]
 
 
-
-# ------------------------------ Auxiliary functions --------------------
-def fit_trajectories(X: np.ndarray, y: np.ndarray):
+class SVMFeat:
     """
-    
-
-    Parameters
-    ----------
-    X : np.ndarray
-        DESCRIPTION.
-    y : np.ndarray
-        DESCRIPTION.
-
-    Returns
-    -------
-    None.
-
+    Model Class Wrapper for an SVM model training on all (time, feature) pair values.
     """
-def convert_to_news_format(X: np.ndarray, y: np.ndarray):
-    """
-    Conversion of 3D array numpy array to time-wise classification 
-    for comparison with NEWS II algorithm
 
-    Parameters
-    ----------
-    X : np.ndarray of shape N x T x D, where N is the number of samples,
-    T is the maximum length of observations and D is the number of features.
-    
-    y : np.ndarray of target labels of shape N x O, where N is the number 
-    of samples, and O is the number of outcome classes. y in one-hot format.
+    def __init__(self, data_info: dict, probability: bool = True, **kwargs):
+        """
+        Initialise object with model configuration.
 
-    Returns
-    -------
-    data_feats :  2D numpy array of shape (N x D) x T
-    labels : 2D numpy array of shape (NxD) x T.
-    """
-    assert X.shape[0] == y.shape[0]
-    
-    # Obtain dimension information
-    N, T, D = X.shape
-    N, O = y.shape
-    
-    
-    # Re-order axis and convert
-    # X_new = np.transpose(X, axes = [0, 2, 1])       # shape N x D x T
-    X_new = np.transpose(X, axes = [0, 1, 2])
-    data_feats = np.reshape(X_new, newshape = (np.multiply(N, T), D))
-    
-    # Convert labels
-    # labels = np.repeat(np.expand_dims(y, axis = 1), repeats = D, axis = 1).reshape((np.multiply(N, D), O))
-    labels = np.repeat(np.expand_dims(y, axis = 1), repeats = T, axis = 1).reshape((np.multiply(N, T), O))
-    
-    return data_feats, labels
+        Params:
+        - data_info: dict, contains information about data configuration, properties and contains data objects.
+        - kwargs: model configuration parameters
+        """
+        # Get dimensionality
+        D_f = data_info["X"][-1].shape[-1]
 
+        # Get proper model_config
+        self.model_config = {key: value for key, value in kwargs.items() if key in SVMFEAT_INPUT_PARAMS}
+        self.D_f = D_f
 
+        if "probability" not in self.model_config.keys():
+            self.model_config["probability"] = probability
 
-def compute_mode(array: np.ndarray) -> np.ndarray:
-    """
-    Compute most common value in array the last axis
-    
-    Parameters
-    ------------
-    array: np.ndarray of shape  A x D, where D is the number of features
-    
-    Returns
-    ------------
-    mode: np.ndarray of shape (A, ) with the mode taken across D dimensions.
-    """
-    
-    # Compute useful info
-    A, D = array.shape
-    array_1d = array.reshape(-1)
-    num_classes = np.unique(array_1d).size
-    
-    
-    # Convert to one hot encoding
-    target_one_hot = np.eye(num_classes)[array_1d]
-    one_hot_resh  = target_one_hot.reshape(A, D, num_classes)        
-    
-    
-    # Compute mode as class column with highest indicators
-    sum_feats = np.sum(one_hot_resh, axis = 1, keepdims = False)  # summing across features
-    mode = np.argmax(sum_feats, axis = -1)                      # compute mode
-    
-    return mode
-    
-    
+        # Initialise other useful information
+        self.run_num = 1
+        self.model_name = "SVMFEAT"
 
-# ---------------------- Load configuration ----------------------------
-load_init_config = {"id_column": 'subject_id', "time_column": 'charttime', 
-                    "feature_set_names": 'vitals',  "fill_limit": None, 
-                    "norm_method": None, "roughly_balanced": None}
+        # Useful for consistency
+        self.training_params = {}
 
-load_config = {"folder_dir": '/home/ds.ccrg.kadooriecentre.org/henrique.aguiar/Desktop/COPD/data/processed/',
-    "X_y_name": ('COPD_VLS_process', 'copd_outcomes'), "time_range": (24, 72),
-    "feature_set": 'vit-lab-sta', "include_time": None}
+        # Get ensemble
+        self.models_per_feat = {
+            feat: SVC(**self.model_config, verbose=True) for feat in range(D_f)
+        }
 
-# Varying params
-generated_seeds = [1001, 1012,1134, 2475, 6138]
-possible_clusters = range(2, 50)
+    def train(self, data_info, **kwargs):
+        """
+        Wrapper method for fitting the model to input data.
 
+        Params:
+        - probability: bool value, indicating whether model should output hard outcome assignments, or probabilistic.
+        - data_info: dictionary with data information, objects and parameters.
+        """
 
-# --------------------------- Main function ------------------------------
-if __name__ == "__main__":
-    
-    # Load data
-    data_processor = utils.data_processor(**load_init_config)
-    X, y, mask, ids, feats = data_processor.load_transform(**load_config)
-    
+        # Unpack relevant data information
+        X_train, X_val, X_test = data_info["X"]
+        y_train, y_val, y_test = data_info["y"]
+        data_name = data_info["data_load_config"]["data_name"]
 
-    # Train Test Split and Normalise
-    X_train_all, X_test, y_train_all, y_test, id_train, id_test, mask_train, mask_test = train_test_split(
-        X, y, ids, mask, train_size=0.4, random_state=2323,
-        shuffle=True, stratify=np.argmax(y, axis=-1))
+        # Update run_num to make space for new experiment
+        run_num = self.run_num
+        save_fd = f"experiments/{data_name}/{self.model_name}/"
 
-    data_processor.norm_method = 'min-max'
-    X_train_all = data_processor.normalise(X_train_all)
-    X_test = data_processor.apply_normalise(X_test)
-    
-    
-    
-    # Conversion to useful format
-    X_feat_train, y_feat_train = convert_to_news_format(X_train_all, y_train_all)
-    X_feat_test, _  = convert_to_news_format(X_test, y_test)
-    labels_train, labels_true = np.argmax(y_feat_train,axis = 1), np.argmax(y_test, axis = 1)
-    
-    
-    
-    # ----------------- Run SVM ------------------
-    N_test, T_test, D_test = X_test.shape
-    O_test = y_test.shape[-1]
-    
-    # Parameter selection
-    C_values = [0.001, 0.1, 10]
-    # kernel_values   = ["rbf", "linear", "poly"]
-    kernel_values = ["linear", "rbf"]
-    seeds    = generated_seeds
-    
-    
-    # ------------------ Scores ----------------------
-    scores_df = pd.DataFrame(data = np.nan, index = [], columns = ["C", "kernel", "seed",
-                                                "auc_unweig", "ac_weig", "f1", "rec", "nmi"])
-    i = 0    
-    for C, kernel, seed in tqdm(itertools.product(C_values, kernel_values, seeds)):
-        print("Current params: \nC: {} \n kernel: {} \n seed {} \n".format(C, kernel, seed))
-        
-        # SVM fit
-        SVM = SVC(C = C, kernel = "linear", random_state = seed, probability=True)
-        SVM.fit(X_feat_train, labels_train)
-        
-        # Make predictions and compute ode
-        SVM_pred = SVM.predict_proba(X_feat_test).reshape(N_test, T_test, O_test)
-        y_pred = np.mean(SVM_pred, axis = 1, keepdims = False) 
-        labels_pred = compute_mode(np.argmax(SVM_pred, axis = -1))     
-        
-        print("Number of predicted class counts: \n", np.unique(labels_pred, return_counts = True))
-        
-        
-        # Compute scores
-        auc_unweig = roc_auc_score(labels_true, y_pred, average = "macro", multi_class = "ovr")
-        auc_weig   = roc_auc_score(labels_true, y_pred, average = "weighted",  multi_class = "ovr")
-        f1  = f1_score(labels_true, labels_pred, average = "macro")
-        rec = recall_score(labels_true, labels_pred, average = "macro")
-        nmi = normalized_mutual_info_score(labels_true, labels_pred)
-        
-        scores_df.loc[i, :] = [C, kernel, seed, auc_unweig, auc_weig, f1, rec, nmi]
-        
-        print("NMI:", nmi)
-        print("auc: ", auc_unweig, auc_weig)
-        i += 1
-    
-    
-    # -------------------------- Aggreggate scores over seed ---------------
-    scores_df.to_csv("SVM-scores-method2.csv", index = True, header = True)
-    
-    scores_df = pd.read_csv("SVM-scores-method2.csv", index_col = 0, header = 0)
-    avg_results = scores_df.groupby(["C", "kernel"], as_index = True).mean()
-    std_results = scores_df.groupby(["C", "kernel"], as_index = True).std()
-    
-    # Compute best scores
-    track_metric = "f1"
-    print("\n\nBest performance according to {}: \n".format(track_metric))
-    print("seed-averaged mean results: \n ", avg_results.loc[avg_results[track_metric].idxmax(), :])
-    print("seed-averaged std results: \n ", std_results.loc[avg_results[track_metric].idxmax(), :])
-        
-        
- 
+        while os.path.exists(save_fd + f"run{run_num}/"):
+            run_num += 1
+
+        # make new folder and update run num
+        os.makedirs(save_fd + f"run{run_num}/")
+        self.run_num = run_num
+
+        # Fit to concatenated X_train, X_val
+        X_train = np.concatenate((X_train, X_val), axis=0)
+        y_train = np.concatenate((y_train, y_val), axis=0)
+
+        for feat_id in range(self.D_f):
+            # Fit model to corresponding feature
+            self.models_per_feat[feat_id].fit(X_train[:, :, feat_id], y_train, sample_weight=None)
+
+        return None
+
+    def analyse(self, data_info):
+        """
+        Evaluation method to compute and save output results.
+
+        Params:
+        - data_info: dictionary with data information, objects and parameters.
+
+        Returns:
+            - y_pred: dataframe of shape (N, output_dim) with outcome probability prediction.
+            - outc_pred: Series of shape (N, ) with predicted outcome based on most likely outcome prediction.
+            - y_true: dataframe of shape (N, output_dim) ith one-hot encoded true outcome.
+
+        Saves a variety of model information, as well.
+        """
+
+        # Unpack test data
+        _, _, X_test = data_info["X"]
+        _, _, y_test = data_info["y"]
+
+        # Get basic data information
+        data_properties = data_info["data_properties"]
+        outc_dims = data_properties["outc_names"]
+        data_load_config = data_info["data_load_config"]
+        data_name = data_load_config["data_name"]
+
+        # Obtain the ids for patients in test set
+        id_info = data_info["ids"][-1]
+        pat_ids = id_info[:, 0, 0]
+
+        # Define save_fd, track_fd
+        save_fd = f"results/{data_name}/{self.model_name}/run{self.run_num}/"
+        track_fd = f"experiments/{data_name}/{self.model_name}/run{self.run_num}/"
+
+        if not os.path.exists(save_fd):
+            os.makedirs(save_fd)
+
+        if not os.path.exists(track_fd):
+            os.makedirs(track_fd)
+
+        # Make prediction on test data
+        if self.model_config["probability"] is True:  # Probability is average of predicted probabilities
+
+            # Initialise output array
+            output_test = np.zeros(shape=y_test.shape)
+            for feat_id in range(self.D_f):
+                # Compute probability for feature
+                output_feat = self.models_per_feat[feat_id].predict_proba(X_test[:, :, feat_id])
+                output_test += output_feat
+
+            # Take average
+            output_test = output_test / self.D_f
+
+        else:
+
+            # Initialise placeholder array - each column keeps track of predicted Class
+            placeholder = np.zeros(shape=y_test.shape)
+
+            for feat_id in range(self.D_f):
+                output_feat = self.models_per_feat[feat_id].predict(X_test[:, :, feat_id])
+
+                # Append to placeholder
+                placeholder[:, feat_id] = output_feat
+
+            # Compute mode
+            mode = stats.mode(placeholder, axis=1)
+
+            # Convert to one-hot encoding
+            output_test = np.eye(y_test.shape[-1])[mode]
+
+        # First, compute predicted y estimates
+        y_pred = pd.DataFrame(output_test, index=pat_ids, columns=outc_dims)
+        outc_pred = pd.Series(np.argmax(output_test, axis=-1), index=pat_ids)
+        y_true = pd.DataFrame(y_test, index=pat_ids, columns=outc_dims)
+
+        # Second, get configuration
+        model_config_all = {feat_id: self.models_per_feat[feat_id].get_params(deep=False) for feat_id in
+                            range(self.D_f)}
+
+        # ----------------------------- Save Output Data --------------------------------
+        # Useful objects
+        y_pred.to_csv(save_fd + "y_pred.csv", index=True, header=True)
+        outc_pred.to_csv(save_fd + "outc_pred.csv", index=True, header=True)
+        y_true.to_csv(save_fd + "y_true.csv", index=True, header=True)
+
+        # save model parameters
+        save_params = {**data_info["data_load_config"], **self.model_config, **self.training_params}
+        with open(save_fd + "config.json", "w+") as f:
+            json.dump(save_params, f, indent=4)
+
+        with open(track_fd + "config.json", "w+") as f:
+            json.dump(save_params, f, indent=4)
+
+        with open(save_fd + "model_config_all.json", "w+") as f:
+            json.dump(model_config_all, f, indent=4)
+
+        with open(track_fd + "model_config_all.json", "w+") as f:
+            json.dump(model_config_all, f, indent=4)
+
+        # Return objects
+        outputs_dic = {"save_fd": save_fd, "model_config": self.model_config,
+                       "y_pred": y_pred, "class_pred": outc_pred, "y_true": y_true
+                       }
+
+        # Print Data
+        print(f"\n\n Experiments saved under {track_fd} and {save_fd}")
+
+        return outputs_dic

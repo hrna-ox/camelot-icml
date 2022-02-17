@@ -231,9 +231,40 @@ class CAMELOT(tf.keras.Model):
                        'identifier' in var.name.lower()]
         rep_vars = self.cluster_rep_set
 
+        # # ------------------------------------------ OPTIMISE PREDICTOR ----------------------------------------
+        #
+        # # Initialise GradientTape to compute gradients
+        # with tf.GradientTape(watch_accessed_variables=False, persistent=True) as tape:
+        #     tape.watch(pred_vars + enc_id_vars + [rep_vars])
+        #
+        #     # Make forward pass
+        #     y_pred, pi = self.forward_pass(x)
+        #     clus_phens = self.Predictor(rep_vars)
+        #
+        #     if self.weighted_loss is True:
+        #         self.loss_weights = model_utils.class_weighting(y)
+        #
+        #     # compute losses
+        #     l_pred = model_utils.l_pred(y, y_pred, weights=self.loss_weights)
+        #     l_enc_id = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.alpha * model_utils.l_dist(pi)
+        #     l_clus = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.beta * model_utils.l_clus(
+        #         clus_phens)
+        #
+        # # Compute gradients
+        # pred_grad = tape.gradient(target=l_pred, sources=pred_vars)
+        # enc_id_grad = tape.gradient(target=l_enc_id, sources=enc_id_vars)
+        # clus_grad = tape.gradient(target=l_clus, sources=rep_vars)
+        #
+        # # Apply gradients
+        # self.optimizer.apply_gradients(zip(pred_grad, pred_vars))
+        # self.optimizer.apply_gradients(zip(enc_id_grad, enc_id_vars))
+        # self.cluster_opt.apply_gradients(zip([clus_grad], [rep_vars]))
+
+        # ------------------------------------------ OPTIMISE PREDICTOR ----------------------------------------
+
         # Initialise GradientTape to compute gradients
         with tf.GradientTape(watch_accessed_variables=False, persistent=True) as tape:
-            tape.watch(pred_vars + enc_id_vars + [rep_vars])
+            tape.watch(pred_vars)
 
             # Make forward pass
             y_pred, pi = self.forward_pass(x)
@@ -244,17 +275,55 @@ class CAMELOT(tf.keras.Model):
 
             # compute losses
             l_pred = model_utils.l_pred(y, y_pred, weights=self.loss_weights)
-            l_enc_id = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.alpha * model_utils.l_dist(pi)
-            l_clus = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.beta * model_utils.l_clus(clus_phens)
 
         # Compute gradients
         pred_grad = tape.gradient(target=l_pred, sources=pred_vars)
-        enc_id_grad = tape.gradient(target=l_enc_id, sources=enc_id_vars)
-        clus_grad = tape.gradient(target=l_clus, sources=rep_vars)
 
         # Apply gradients
         self.optimizer.apply_gradients(zip(pred_grad, pred_vars))
+
+        # ------------------------------------------ OPTIMISE ENCODER - IDENTIFIER ------------------------------------
+
+        # Initialise GradientTape to compute gradients
+        with tf.GradientTape(watch_accessed_variables=False, persistent=True) as tape:
+            tape.watch(enc_id_vars)
+
+            # Make forward pass
+            y_pred, pi = self.forward_pass(x)
+
+            if self.weighted_loss is True:
+                self.loss_weights = model_utils.class_weighting(y)
+
+            # compute losses
+            l_enc_id = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.alpha * model_utils.l_dist(pi)
+
+        # Compute gradients
+        enc_id_grad = tape.gradient(target=l_enc_id, sources=enc_id_vars)
+
+        # Apply gradients
         self.optimizer.apply_gradients(zip(enc_id_grad, enc_id_vars))
+
+        # ------------------------------------------ OPTIMISE CLUSTERS ----------------------------------------
+
+        # Initialise GradientTape to compute gradients
+        with tf.GradientTape(watch_accessed_variables=False, persistent=True) as tape:
+            tape.watch([rep_vars])
+
+            # Make forward pass
+            y_pred, pi = self.forward_pass(x)
+            clus_phens = self.Predictor(rep_vars)
+
+            if self.weighted_loss is True:
+                self.loss_weights = model_utils.class_weighting(y)
+
+            # compute losses
+            l_clus = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.beta * model_utils.l_clus(
+                rep_vars)
+
+        # Compute gradients
+        clus_grad = tape.gradient(target=l_clus, sources=rep_vars)
+
+        # Apply gradients
         self.cluster_opt.apply_gradients(zip([clus_grad], [rep_vars]))
 
         return {"L_pred": l_pred, "L_clus_id": l_enc_id, "L_clus_sep": l_clus}
@@ -360,7 +429,7 @@ class CAMELOT(tf.keras.Model):
         inputs = tf.data.Dataset.from_tensor_slices((x, y)).shuffle(buffer_size=5000).batch(batch_size)
 
         # Initialise loss tracker
-        self.enc_pred_loss_tracker = pd.DataFrame(data=np.nan, index=range(1, 1+ epochs), columns=["train_loss", "val_loss"])
+        self.enc_pred_loss_tracker = pd.DataFrame(data=np.nan, index=[], columns=["train_loss", "val_loss"])
         enc_pred_vars = [var for var in self.trainable_variables if "Encoder" in var.name or "Predictor" in var.name]
 
         # Iterate through epochs and batches
@@ -394,7 +463,12 @@ class CAMELOT(tf.keras.Model):
             # Print result and update tracker
             print("End of epoch %d - \n Training loss: %.4f  Validation loss %.4f" % (
                 epoch, epoch_loss / step_, loss_val))
-            self.enc_pred_loss_tracker.loc[epoch+1, :] = [epoch_loss / step_, loss_val]
+
+            # Check if result hasn't improved for 2 epochs
+            if epoch > 300 and loss_val >= self.enc_pred_loss_tracker.iloc[-300:-1, -1].min():
+                break
+
+            self.enc_pred_loss_tracker.loc[epoch + 1, :] = [epoch_loss / step_, loss_val]
 
     def _initialise_clus(self, x, val_x, **kwargs):
         """
@@ -465,7 +539,7 @@ class CAMELOT(tf.keras.Model):
         inputs = tf.data.Dataset.from_tensor_slices((X_train, clus_train_y)).shuffle(buffer_size=5000).batch(batch_size)
 
         # Initialise loss tracker
-        self.iden_loss_tracker = pd.DataFrame(data=np.nan, index=range(1, 1 + epochs), columns=["train_loss", "val_loss"])
+        self.iden_loss_tracker = pd.DataFrame(data=np.nan, index=[], columns=["train_loss", "val_loss"])
         iden_vars = [var for var in self.trainable_variables if "Identifier" in var.name]
 
         # Forward Identifier pass and train
@@ -500,11 +574,12 @@ class CAMELOT(tf.keras.Model):
             # Print result and update tracker
             print("End of epoch %d - \n Training loss: %.4f  Validation loss %.4f" % (
                 epoch, epoch_loss / step_, loss_val))
-            self.iden_loss_tracker.loc[epoch + 1, :] = [epoch_loss / step_, loss_val]
 
-            # Check if has improved or not - look at last 50 epoch validation loss and check if 
-            if self.iden_loss_tracker.iloc[-50:, -1].le(loss_val + 0.001).any():
+            # Check if result hasn't improved for 2 epochs
+            if epoch > 1000 and loss_val >= self.iden_loss_tracker.iloc[-1000:-1, -1].min():
                 break
+
+            self.iden_loss_tracker.loc[epoch + 1, :] = [epoch_loss / step_, loss_val]
 
     # Useful Methods to compute attributes and model properties.
     def compute_unnorm_attention_weights(self, inputs):
@@ -594,22 +669,26 @@ class CAMELOT(tf.keras.Model):
         return config
 
 
-
-CAMELOT_INPUT_PARAMS = ["num_clusters", "latent_dim", "seed", "output_dim", "name", "alpha", "beta", "regulariser_params", "dropout", "encoder_params", "identifier_params",
+CAMELOT_INPUT_PARAMS = ["num_clusters", "latent_dim", "seed", "output_dim", "name", "alpha", "beta",
+                        "regulariser_params", "dropout", "encoder_params", "identifier_params",
                         "predictor_params", "cluster_rep_lr", "optimizer_init", "weighted_loss"]
+
+
 class Model(CAMELOT):
     """
     Model Class Wrapper for CAMELOT with train and analyse methods.
     """
 
-    def __init__(self, output_dim: int = 4, **kwargs):
+    def __init__(self, data_info: dict, **kwargs):
         """
         Initialise object with model configuration.
 
         Params:
-        - output_dim: dimensionality of output space (default=4).
+        - data_info: dict, contains basic data information, objects and properties
         - kwargs: other model configuration parameters
         """
+        # Get output dimension
+        output_dim = data_info["y"][-1].shape[-1]
 
         # Useful information
         relevant_params = {key: value for key, value in kwargs.items() if key in CAMELOT_INPUT_PARAMS}
@@ -620,7 +699,7 @@ class Model(CAMELOT):
         # Initialise training parameters
         self.training_params = None
 
-        super().__init__(output_dim=output_dim, **kwargs)
+        super().__init__(**self.model_config)
 
     def train(self, data_info, lr: float = 0.001, epochs_init: int = 100, epochs: int = 100, bs: int = 32,
               cbck_str: str = "auc-sup-scores-cm", **kwargs):
@@ -643,6 +722,9 @@ class Model(CAMELOT):
             "cbck_str": cbck_str
         }
 
+        # Get data useful info
+        data_name = data_info["data_load_config"]["data_name"]
+
         # Unpack relevant data information
         X_train, X_val, X_test = data_info["X"]
         y_train, y_val, y_test = data_info["y"]
@@ -663,11 +745,12 @@ class Model(CAMELOT):
 
         # Main Training phase
         print("-" * 20, "\n", "STARTING MAIN TRAINING PHASE")
-        callbacks, run_num = model_utils.get_callbacks((X_val, y_val), track_loss="L_pred", other_cbcks=cbck_str,
+        callbacks, run_num = model_utils.get_callbacks((X_val, y_val), data_name=data_name, track_loss="L_pred",
+                                                       other_cbcks=cbck_str,
                                                        early_stop=True, lr_scheduler=True, tensorboard=True)
         self.run_num = run_num
         history = self.fit(x=X_train, y=y_train, validation_data=(X_val, y_val), batch_size=bs, epochs=epochs,
-                 verbose=2, callbacks=callbacks, **kwargs)
+                           verbose=2, callbacks=callbacks, **kwargs)
 
         return history
 
@@ -765,7 +848,6 @@ class Model(CAMELOT):
         save_params = {**data_info["data_load_config"], **self.model_config, **self.training_params}
         with open(save_fd + "config.json", "w+") as f:
             json.dump(save_params, f, indent=4)
-
 
         with open(track_fd + "config.json", "w+") as f:
             json.dump(save_params, f, indent=4)

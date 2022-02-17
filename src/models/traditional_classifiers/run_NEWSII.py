@@ -1,140 +1,145 @@
-from typing import Union, List
-import utils
+import json
+import os
+
 import numpy as np
 import pandas as pd
 
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_auc_score, f1_score, recall_score, normalized_mutual_info_score
-np.set_printoptions(precision=3, suppress = True)
-
+from src.data_processing.data_loading_utils import _is_id_feat
 
 
 # ---------------------- AUXILIARY FUNCTIONS FOR NEWS II ---------------------
 def score_HR(x):
     if x <= 40:
         return 3
-    
-    elif 40 < x and x <= 50:
+
+    elif 40 < x <= 50:
         return 1
-    
-    elif 50 < x and x <= 90:
+
+    elif 50 < x <= 90:
         return 0
 
-    elif 90 < x and x <= 110:
+    elif 90 < x <= 110:
         return 2
 
-    elif 110 < x and x <= 130:
+    elif 110 < x <= 130:
         return 2
-    
+
     elif 130 < x:
-        return 3 
+        return 3
+
 
 def score_RR(x):
     if x <= 8:
         return 3
-    
-    elif 8 < x and x <= 11:
-        return 1
-    
-    elif 11 < x and x <= 20:
-        return 0
-    
 
-    elif 20 < x and x <= 24:
+    elif 8 < x <= 11:
+        return 1
+
+    elif 11 < x <= 20:
+        return 0
+
+    elif 20 < x <= 24:
         return 2
-    
+
     elif 24 < x:
         return 3
-    
+
+
 def score_SBP(x):
     if x <= 90:
         return 3
-    
-    elif 90 < x and x <= 100:
+
+    elif 90 < x <= 100:
         return 2
-    
-    elif 100 < x and x <= 110:
+
+    elif 100 < x <= 110:
         return 1
-    
-    elif 110 < x and x <= 219:
+
+    elif 110 < x <= 219:
         return 0
-    
+
     elif x >= 219:
         return 3
-    
+
+
 def score_DBP(x):
     return 0
+
 
 def score_FIO2(x):
     if x <= 22:
         return 0
-    
+
     else:
         return 2
 
+
 def score_AVPU(x):
-    
     if x == 1:
         return 0
-    
+
     else:
         return 3
+
 
 def score_TEMP(x):
     if x <= 35.0:
         return 3
-    
-    elif 35.0 < x and x <= 36.0:
+
+    elif 35.0 < x <= 36.0:
         return 1
-    
-    elif 36.0 < x and x <= 38.0:
+
+    elif 36.0 < x <= 38.0:
         return 0
-    
-    elif 38.0 < x and x <= 39.0:
+
+    elif 38.0 < x <= 39.0:
         return 1
-    
+
     elif 39.0 < x:
         return 2
-    
+
+
 def score_SPO2_1(x):
     if x <= 91:
         return 3
-    
-    elif 91 < x and x <= 93:
+
+    elif 91 < x <= 93:
         return 2
-    
-    elif 93 < x and x <= 95:
+
+    elif 93 < x <= 95:
         return 1
-    
+
     elif 95 < x:
         return 0
-    
+
+
 def score_SPO2_2(x, oxygen):
     if x <= 83:
         return 3
-    
-    elif 83 < x and x <= 85:
+
+    elif 83 < x <= 85:
         return 2
-    
-    elif 85 < x and x <= 87:
+
+    elif 85 < x <= 87:
         return 1
-    
-    elif 87 < x and x <= 92:
+
+    elif 87 < x <= 92:
         return 0
-    
+
     elif 92 < x and not oxygen:
         return 0
-    
-    elif 92 < x and x <= 94 and oxygen:
+
+    elif 92 < x <= 94 and oxygen:
         return 1
-    
-    elif 94 < x and x <= 96 and oxygen:
+
+    elif 94 < x <= 96 and oxygen:
         return 2
-    
+
     elif 96 < x and oxygen:
         return 3
-    
-feature_scoring_dic = {
+
+
+FEATURE_SCORING_DIC = {
     "HR": score_HR,
     "RR": score_RR,
     "SBP": score_SBP,
@@ -144,76 +149,6 @@ feature_scoring_dic = {
     "TEMP": score_TEMP,
     "SPO2": score_SPO2_2
 }
-
-class NewsII:
-    def __init__(self, feature_scoring_dic):
-        self.feature_score = feature_scoring_dic
-        
-        
-    def _check_validity(self, columns):
-        "Check all feature score keys are also present in columns"
-        try:
-            assert set(self.feature_score.keys()).issubset(set(columns))
-        
-        except Exception:
-            raise ValueError("Columns do not match scoring keys!")
-        
-        
-    def evaluate(self, X: np.ndarray, X_columns: Union[List, pd.Index]):
-        """
-        Evaluation function for data X and columns as given by X_columns.
-
-        Parameters
-        ----------
-        X : data 3D array of shape N x T x D', where N is the number of 
-        samples, T the maximum number of time-steps and D' the number of feats.
-        D' can include more features than the ones specified in the scoring 
-        function. These will be ignored in calculation
-        
-        X_columns : List or pandas Index of corresponding column names 
-        for data X. Has size (D, ).
-
-        Returns
-        -------
-        score : Corresponding NewsII score.
-        """
-        
-        # Quick check conditions
-        self._check_validity(X_columns)
-        assert X.shape[-1] == len(list(X_columns))
-        
-        # Subset only to last time-step
-        data = X[:, -1, :]                  
-
-        
-        # Initialise score array
-        score = np.zeros(shape = X.shape[0])
-        
-        
-        # Compute oxygen presence
-        fio2_id = X_columns.index("FIO2")
-        oxygen = np.vectorize(score_FIO2)(data[:, fio2_id]) > 0
-        
-        
-        # Iterate through each vital sign and compute score accordingly
-        for vital in self.feature_score.keys():
-            
-            # Obtain id and access data
-            idx = X_columns.index(vital)
-            vital_info = data[:, idx]
-            
-            # Compute score by iterating
-            if vital != "SPO2":
-                score_feat = np.vectorize(self.feature_score[vital])(vital_info)
-                
-            else:
-                score_feat = np.array([score_SPO2_2(x, has_oxygen) for
-                               x, has_oxygen in zip(vital_info, oxygen)])
-                
-            score += score_feat
-        
-        return score
-
 
 
 def compute_binary(one_hot_labels: np.ndarray, target_label: int):
@@ -234,137 +169,167 @@ def compute_binary(one_hot_labels: np.ndarray, target_label: int):
     one_hot_labels matches target_label.
     """
     assert target_label in range(one_hot_labels.shape[-1])
-    
-    binarised = (np.argmax(one_hot_labels, axis = -1) == target_label)
-    
+
+    binarised = (np.argmax(one_hot_labels, axis=-1) == target_label)
+
     return binarised.astype(int)
 
 
-# ------------------------- Configuration loading ---------------------
-# Load configuration parameters
-load_init_config = {"id_column": 'subject_id', "time_column": 'charttime', 
-                    "feature_set_names": 'vitals', "fill_limit": None, 
-                    "norm_method": None, "roughly_balanced": None}
-load_config = {"folder_dir": '/home/ds.ccrg.kadooriecentre.org/henrique.aguiar/Desktop/COPD/data/processed/',
-    "X_y_name": ('COPD_VLS_process', 'copd_outcomes'), "time_range": (24, 72),
-    "feature_set": 'vit-lab-sta', "include_time": None}
+NEWS_INPUT_PARAMS = []
 
 
+class NEWS:
+    """
+    Model Class Wrapper for a NEWS Classifier Model.
+    """
 
+    def __init__(self, data_info: dict, **kwargs):
+        """
+        Initialise object with model configuration.
 
-# ------------------------ Main function -------------------------
-if __name__ == "__main__":
-    
-    # Load Data
-    data_processor = utils.data_processor(**load_init_config)
-    X, y, mask, ids, cols = data_processor.load_transform(**load_config)
+        Params:
+        - data_info: dict, contains information about data configuration, properties and contains data objects.
+        - kwargs: model configuration parameters
+        """
+        # Get feature information
+        feats = data_info["data_properties"]["feats"]
 
+        # Identify those that are not id columns
+        self.feats = [feat for feat in feats if not _is_id_feat(feat)]
+        self.data_name = data_info["data_properties"]["data_name"]
 
-    # Split data and Normalised- Data is not normalised with NEWS II
-    X_train_all, X_test, y_train_all, y_test, id_train, id_test, mask_train, mask_test = train_test_split(
-        X, y, ids, mask, train_size=0.4, random_state=2323,
-        shuffle=True, stratify=np.argmax(y, axis=-1))
+        # Get proper model_config
+        self.model_config = {key: value for key, value in kwargs.items() if key in NEWS_INPUT_PARAMS}
 
-    labels_train, labels_true = np.argmax(y_train_all, axis = 1), np.argmax(y_test, axis = 1)
-    feats = [col for col in cols if col not in ["subject_id", "charttime", "time_to_end"]]
+        # Initialise other useful information
+        self.run_num = 1
+        self.model_name = "NEWS"
 
-    
-    # ------------------- Evaluate NEWS II ---------------------
-    # Run News II
-    news = NewsII(feature_scoring_dic = feature_scoring_dic)
-    news_score = news.evaluate(X_test, feats)
-    news_score = news_score / np.max(news_score)
-    reverse_news_score = 1 - news_score
-    
-    # Predicted labels
-    # list_of_thresholds = np.arange(start = 0.0, stop = 1.0, step = 0.1)
-    list_of_thresholds = [0.5]
-    
-    # Create targets for each class
-    targets    = ["Healthy", "Death", "ICU", "Cardiac"]
-    class_scores = pd.DataFrame(data = np.nan, index = ["auc", "f1", "rec"],
-                                columns = targets)
-    reverse_class_scores = pd.DataFrame(data = np.nan, index = ["auc", "f1", "rec"],
-                                columns = targets)
-    
-    weights = np.sum(y_test, axis = 0) / np.sum(y_test)
-    
-    # Compute class AUROC and average
-    for target_label in range(y_test.shape[-1]):
-        
-        # Binary targets for the labels
-        labels_true = compute_binary(y_test, target_label)
-        
-        # scores per class
-        auc = roc_auc_score(labels_true, news_score)
-        nmi = normalized_mutual_info_score(labels_true, news_score)
-        
-        f1_list = [f1_score(labels_true, (news_score >= threshold)) for
-               threshold in list_of_thresholds]
-        rec_list = [recall_score(labels_true, (news_score >= threshold)) for
-               threshold in list_of_thresholds]
-        
-        # Pick best threshold
-        f1 = np.max(f1_list)
-        rec = rec_list[f1_list.index(f1)]
-        print("Regular threshold: ", list_of_thresholds[f1_list.index(f1)])
-        
-        # reverse score per class
-        reverse_auc = roc_auc_score(labels_true, reverse_news_score)
-        
-        reverse_f1_list = [f1_score(labels_true, (news_score < threshold)) for
-               threshold in list_of_thresholds]
-        reverse_rec_list = [recall_score(labels_true, (news_score < threshold)) for
-               threshold in list_of_thresholds]
-        
-        # Pick best threshold
-        reverse_f1 = np.max(reverse_f1_list)
-        reverse_rec = reverse_rec_list[reverse_f1_list.index(reverse_f1)]
-        print("Regular threshold: ", 
-              list_of_thresholds[reverse_f1_list.index(reverse_f1)])
-        
-        # Update class scores
-        class_scores.iloc[:, target_label] = [auc, f1, rec]
-        reverse_class_scores.iloc[:, target_label] = [reverse_auc, 
-                                                      reverse_f1, reverse_rec]
-    
+        # Useful for consistency
+        self.training_params = {}
 
-    # Compute Unweighted Average and weighted averages
-    auc_avg = class_scores.loc["auc", :].mean()
-    auc_weig = np.sum(np.multiply(class_scores.loc["auc", :], weights))
-    f1_avg = class_scores.loc["f1", :].mean()
-    rec_avg = class_scores.loc["rec", :].mean()
-    
-    # Compute Unweighted Average and weighted averages for reverse scores
-    rev_auc_avg = reverse_class_scores.loc["auc", :].mean()
-    rev_auc_weig = np.sum(np.multiply(reverse_class_scores.loc["auc", :], weights))
-    rev_f1_avg = reverse_class_scores.loc["f1", :].mean()
-    rev_rec_avg = reverse_class_scores.loc["rec", :].mean()
-    
-    nmi = normalized_mutual_info_score(labels_true, labels_pred)
-    
-    # Print results
-    print("Results for News II: \n")
-    print("AUC average: ", auc_avg)
-    print("AUC weighted: ", auc_weig)
-    print("F1 avg: ", f1_avg)
-    print("Recall avg: ", rec_avg)     
-    
-    
-    # Print results
-    print("Results for News II: \n")
-    print("AUC average: ", rev_auc_avg)
-    print("AUC weighted: ", rev_auc_weig)
-    print("F1 avg: ", rev_f1_avg)
-    print("Recall avg: ", rev_rec_avg)     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    def train(self, data_info, **kwargs):
+        """
+        Wrapper method for fitting the model to input data.
+
+        Params:
+        - probability: bool value, indicating whether model should output hard outcome assignments, or probabilistic.
+        - data_info: dictionary with data information, objects and parameters.
+        """
+
+        # Get data_name
+        data_name = data_info["data_load_config"]["data_name"]
+
+        # Update run_num to make space for new experiment
+        run_num = self.run_num
+        save_fd = f"experiments/{data_name}/{self.model_name}/"
+
+        while os.path.exists(save_fd + f"run{run_num}/"):
+            run_num += 1
+
+        # make new folder and update run num
+        os.makedirs(save_fd + f"run{run_num}/")
+        self.run_num = run_num
+
+        return None
+
+    def predict(self, X_test):
+        """
+        Make predictions on X_test array.
+
+        Params:
+        - X_test: numpy array of shape (N, D_f)
+
+        Returns:
+            - NEWS score for each patient, of shape (N, ).
+        """
+
+        # Initialize output array
+        output_scores = np.zeros(X_test.shape[0])
+
+        # Compute score per each feature
+        num_feats_used = 0
+        for feat_id, feat in enumerate(self.feats):
+
+            # Which feature does it correspond to?
+            if feat in FEATURE_SCORING_DIC.keys():
+
+                # Load score for feature
+                scoring_fn = FEATURE_SCORING_DIC[feat]
+
+                if "mimic" in self.data_name.lower() and feat == "SPO2":
+                    scoring_fn = score_SPO2_1  # MIMIC DOES NOT HAVE OXYGEN INFORMATION.
+
+                # Apply score to data
+                output_scores += scoring_fn(X_test[:, feat_id])
+
+                # add 1 to the number of features
+                num_feats_used += 1
+
+        # Take average
+        output_scores = output_scores / num_feats_used
+
+        return output_scores
+
+    def analyse(self, data_info):
+        """
+        Evaluation method to compute and save output results.
+
+        Params:
+        - data_info: dictionary with data information, objects and parameters.
+
+        Returns:
+            - y_pred: dataframe of shape (N, output_dim) with outcome probability prediction.
+            - outc_pred: Series of shape (N, ) with predicted outcome based on most likely outcome prediction.
+            - y_true: dataframe of shape (N, output_dim) ith one-hot encoded true outcome.
+
+        Saves a variety of model information, as well.
+        """
+
+        # Unpack test data
+        _, _, X_test = data_info["X"]
+        _, _, y_test = data_info["y"]
+
+        # Get basic data information
+        data_properties = data_info["data_properties"]
+        data_load_config = data_info["data_load_config"]
+        data_name = data_load_config["data_name"]
+
+        # Obtain the ids for patients in test set
+        id_info = data_info["ids"][-1]
+        pat_ids = id_info[:, 0, 0]
+
+        # Define save_fd, track_fd
+        save_fd = f"results/{data_name}/{self.model_name}/run{self.run_num}/"
+        track_fd = f"experiments/{data_name}/{self.model_name}/run{self.run_num}/"
+
+        if not os.path.exists(save_fd):
+            os.makedirs(save_fd)
+
+        if not os.path.exists(track_fd):
+            os.makedirs(track_fd)
+
+        # Make prediction on test data
+        output_test = self.predict(X_test[:, -1, :])  # Apply NewsI on last observation sign.
+
+        # Save model scores
+        news_scores = pd.Series(output_test, index=pat_ids)
+        news_scores.to_csv(save_fd + "news_scores.csv", index=True)
+
+        # save model parameters
+        save_params = {**data_info["data_load_config"], **self.model_config, **self.training_params}
+        with open(save_fd + "config.json", "w+") as f:
+            json.dump(save_params, f, indent=4)
+
+        with open(track_fd + "config.json", "w+") as f:
+            json.dump(save_params, f, indent=4)
+
+        # Return objects
+        outputs_dic = {"save_fd": save_fd, "model_config": self.model_config,
+                       "news_scores": news_scores
+                       }
+
+        # Print Data
+        print(f"\n\n Experiments saved under {track_fd} and {save_fd}")
+
+        return outputs_dic

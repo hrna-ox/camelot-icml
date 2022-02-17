@@ -25,7 +25,7 @@ with open("data/MIMIC/processed/units_dic.json", "r") as f:
     f.close()
 
 
-def plot_attention(alpha, beta, gamma, clus_pred = None, feats=None):
+def plot_attention(alpha, beta, gamma, clus_pred=None, feats=None):
     """
     Plot attention maps given alpha, beta maps and predicted cluster maps.
 
@@ -56,19 +56,18 @@ def plot_attention(alpha, beta, gamma, clus_pred = None, feats=None):
 
     # Iterate over clusters
     for k in range(K):
-
         # first version of attention map computation
         gamma_k = gamma[:, k, :]
         heatmap_k_1 = _get_attention_v1(alpha, beta, gamma_k)
-        heatmap_k_2 = _get_attention_v2(alpha, beta, clus_pred==k)
+        heatmap_k_2 = _get_attention_v2(alpha, beta, clus_pred == k)
 
         # Plot map
         yticklabels = [time_id for time_id in range(heatmap_k_1.shape[0])][::-1]
         xticklabels = [feat for feat in feats if not _is_id_feat(feat)]
 
-        sns.heatmap(data=heatmap_k_1, ax=axes1[k], cbar = k==0, xticklabels=xticklabels, yticklabels=yticklabels,
+        sns.heatmap(data=heatmap_k_1, ax=axes1[k], cbar=k == 0, xticklabels=xticklabels, yticklabels=yticklabels,
                     cbar_ax=None if k else cbar_ax1)
-        sns.heatmap(data=heatmap_k_2, ax=axes2[k], cbar = k==0, xticklabels=xticklabels, yticklabels=yticklabels,
+        sns.heatmap(data=heatmap_k_2, ax=axes2[k], cbar=k == 0, xticklabels=xticklabels, yticklabels=yticklabels,
                     cbar_ax=None if k else cbar_ax2)
 
         # Add Titles
@@ -91,12 +90,13 @@ def _get_attention_v1(alpha, beta, gamma_k):
     - heatmaps array of shape: (K, T, D_f) with the resulting average attention weights.
     """
     # Get time multiplication
-    per_pat_time_feat_map = np.multiply(alpha, beta)                      # shape (N, T, D_f)
+    per_pat_time_feat_map = np.multiply(alpha, beta)  # shape (N, T, D_f)
 
     # Approximate by cluster
-    cohort_attention = np.multiply(per_pat_time_feat_map, np.expand_dims(gamma_k, axis=-1))       # shape (N, T, D_f)
+    cohort_attention = np.multiply(per_pat_time_feat_map, np.expand_dims(gamma_k, axis=-1))  # shape (N, T, D_f)
 
     return np.mean(cohort_attention, axis=0)
+
 
 def _get_attention_v2(alpha, beta, is_in_clus_bool):
     """
@@ -111,7 +111,7 @@ def _get_attention_v2(alpha, beta, is_in_clus_bool):
     - heatmaps array of shape: (K, T, D_f) with the resulting average attention weights.
     """
     # Get time multiplication
-    per_pat_time_feat_map = np.multiply(alpha, beta)                      # shape (N, T, D_f)
+    per_pat_time_feat_map = np.multiply(alpha, beta)  # shape (N, T, D_f)
 
     if np.sum(is_in_clus_bool) == 0:
         return np.zeros(shape=per_pat_time_feat_map.shape[1:])
@@ -171,7 +171,6 @@ def get_basic_info(save_fd: str = None, data_info: dict = None):
     return save_fd, data_load_config, data_name
 
 
-
 def plot_loss_fn(train_values: List, val_values: List):
     """
     Plot loss_function evolution during training given loss_values during training and validation.
@@ -193,6 +192,7 @@ def plot_loss_fn(train_values: List, val_values: List):
 
     # Add labels
     ax.set_xlabel("Epochs")
+    ax.legend()
 
     return fig, ax
 
@@ -528,7 +528,7 @@ def get_dists_per_clus(pis_pred):
         clus_subset = pis_pred[clus_pred == clus]
 
         # Plot IQR ranges
-        axes[clus_id].boxplot(x=clus_subset, labels=range(1, N+1))
+        axes[clus_id].boxplot(x=clus_subset, labels=range(1, N + 1))
         axes[clus_id].set_title(f"Clus = {clus}")
 
     return fig, axes

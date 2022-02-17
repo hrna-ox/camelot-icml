@@ -5,7 +5,7 @@ Date Last updated: 24 Jan 2022
 Author: Henrique Aguiar
 Please contact via henrique.aguiar@eng.ox.ac.uk
 """
-import json
+import json, sys
 import matplotlib.pyplot as plt
 
 from src.data_processing.data_loader import data_loader
@@ -38,7 +38,7 @@ def main():
     "Data Loading."
     data_info = data_loader(**data_config)
     model_config["output_dim"] = data_info["y"][-1].shape[-1]
-    data_name = data_config["data_name"]
+    model_config["D_f"] = data_info["X"][-1].shape[-1]
 
     "Visualise Data Properties"
     vis_main.visualise_data_groups(data_info)
@@ -47,7 +47,7 @@ def main():
 
     "Load model and fit"
     print("\n\n\n\n")
-    model = model_utils.get_model_from_str(**model_config)
+    model = model_utils.get_model_from_str(data_info=data_info, **model_config)
 
     # Train model
     history = model.train(data_info=data_info, **training_config)
@@ -64,7 +64,7 @@ def main():
     # ------------------------ Results Visualisations --------------------------
     "Learnt Group averages"
 
-    # Get original data subsetted only to test set
+    # Cluster Groups understanding where relevant
     vis_main.visualise_cluster_groups(**outputs_dic, data_info=data_info)
 
     # "Losses where relevant"
@@ -81,6 +81,7 @@ def main():
 
     print("Analysis Complete.")
     plt.show()
+    sys.exit()
 
 if __name__ == "__main__":
     main()
