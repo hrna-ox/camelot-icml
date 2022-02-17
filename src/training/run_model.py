@@ -54,19 +54,19 @@ outputs_dic = model.analyse(data_info)
 # -------------------------------------- Evaluate Scores --------------------------------------
 
 "Evaluate scores on the resulting models. Note X_test is converted back to input dimensions."
-# scores = evaluate(**outputs_dic, data_info=data_info, avg=None)
+scores = evaluate(**outputs_dic, data_info=data_info, avg=None)
 
 # ------------------------ Results Visualisations --------------------------
 "Learnt Group averages"
 
 # Get original data subsetted only to test set
-# vis_main.visualise_cluster_groups(**outputs_dic, data_info=data_info)
+vis_main.visualise_cluster_groups(**outputs_dic, data_info=data_info)
 
 # "Losses where relevant"
 # vis_main.plot_losses(history=history, **outputs_dic, data_info=data_info)
 
 # "Clus assignments where relevant"
-vis_main.visualise_cluster_assignment(**outputs_dic, data_info=data_info)
+# vis_main.visualise_cluster_assignment(**outputs_dic, data_info=data_info)
 
 # "Attention maps where relevant"
-vis_main.visualise_attention_maps(**outputs_dic, data_info=data_info)
+# vis_main.visualise_attention_maps(**outputs_dic, data_info=data_info)

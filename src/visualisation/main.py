@@ -258,3 +258,5 @@ def visualise_attention_maps(save_fd=None, data_info:dict = None, clus_pred=None
 
             # Plot attention weights
             (fig, ax) = utils.plot_attention_map(alpha, beta, clus_pred=clus_pred)
+
+    return None
