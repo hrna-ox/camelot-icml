@@ -25,15 +25,16 @@ with open("data/MIMIC/processed/units_dic.json", "r") as f:
     f.close()
 
 
-def plot_attention(alpha, beta, gamma, clus_pred = None):
+def plot_attention(alpha, beta, gamma, clus_pred = None, feats=None):
     """
     Plot attention maps given alpha, beta maps and predicted cluster maps.
 
     Params:
     - alpha, beta: alpha, beta attention weights.
     - clus_pred: array-like of shape (N, ) with categorical cluster assignment.
+    - feats: None or List of yticklabels to print.
 
-    Returns: Tuple of tuple of (fig, ax) objects representing:
+    Returns: Tuple of (fig, ax) objects representing:
         - general alpha, beta, gamma for cluster membership.
         - alpha, beta attention maps for cluster cohorts identified in clus_pred.
     """
@@ -41,21 +42,40 @@ def plot_attention(alpha, beta, gamma, clus_pred = None):
     K = gamma.shape[1]
     nrows, ncols = _nrows_ncols(K)
 
-    # Initialise plot 1
+    # Initialise plots 1 and 2
     fig1, ax1 = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=True)
+    fig2, ax2 = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=True)
+
+    # Reshape axis
     axes1 = ax1.reshape(-1)
+    axes2 = ax2.reshape(-1)
+
+    # Add common colorbar
+    cbar_ax1 = fig1.add_axes([0.91, 0.3, 0.03, 0.4])
+    cbar_ax2 = fig2.add_axes([0.91, 0.3, 0.03, 0.4])
 
     # Iterate over clusters
     for k in range(K):
 
         # first version of attention map computation
         gamma_k = gamma[:, k, :]
-        heatmap_k = _get_attention_v1(alpha, beta, gamma_k)
+        heatmap_k_1 = _get_attention_v1(alpha, beta, gamma_k)
+        heatmap_k_2 = _get_attention_v2(alpha, beta, clus_pred==k)
 
         # Plot map
-        # sns.heatmap()
+        yticklabels = [time_id for time_id in range(heatmap_k_1.shape[0])][::-1]
+        xticklabels = [feat for feat in feats if not _is_id_feat(feat)]
 
-    return None
+        sns.heatmap(data=heatmap_k_1, ax=axes1[k], cbar = k==0, xticklabels=xticklabels, yticklabels=yticklabels,
+                    cbar_ax=None if k else cbar_ax1)
+        sns.heatmap(data=heatmap_k_2, ax=axes2[k], cbar = k==0, xticklabels=xticklabels, yticklabels=yticklabels,
+                    cbar_ax=None if k else cbar_ax2)
+
+        # Add Titles
+        axes1[k].set_title(f"Clus {k}")
+        axes2[k].set_title(f"Clus {k}")
+
+    return (fig1, ax1), (fig2, ax2)
 
 
 def _get_attention_v1(alpha, beta, gamma_k):
@@ -65,7 +85,7 @@ def _get_attention_v1(alpha, beta, gamma_k):
     Params:
     - alpha: attention weights of shape (N, T, D_f)
     - beta: attention weights of shape (1, T, 1)
-    - gamma_k: cluster k attention weights of shape (N, D_f)
+    - gamma_k: cluster k attention weights of shape (N, T)
 
     Returns:
     - heatmaps array of shape: (K, T, D_f) with the resulting average attention weights.
@@ -74,10 +94,33 @@ def _get_attention_v1(alpha, beta, gamma_k):
     per_pat_time_feat_map = np.multiply(alpha, beta)                      # shape (N, T, D_f)
 
     # Approximate by cluster
-    cohort_attention = np.multiply(per_pat_time_feat_map, np.expand_dims(gamma_k, axis=1))       # shape (N, T, D_f)
+    cohort_attention = np.multiply(per_pat_time_feat_map, np.expand_dims(gamma_k, axis=-1))       # shape (N, T, D_f)
 
     return np.mean(cohort_attention, axis=0)
 
+def _get_attention_v2(alpha, beta, is_in_clus_bool):
+    """
+    Attention maps computation version 1.
+
+    Params:
+    - alpha: attention weights of shape (N, T, D_f)
+    - beta: attention weights of shape (1, T, 1)
+    - is_in_clus_bool: boolean series indicating whether patient belongs to cluster or not.
+
+    Returns:
+    - heatmaps array of shape: (K, T, D_f) with the resulting average attention weights.
+    """
+    # Get time multiplication
+    per_pat_time_feat_map = np.multiply(alpha, beta)                      # shape (N, T, D_f)
+
+    if np.sum(is_in_clus_bool) == 0:
+        return np.zeros(shape=per_pat_time_feat_map.shape[1:])
+
+    else:
+        # Subset cohort given whether they are in cluster
+        cohort_attention = per_pat_time_feat_map[is_in_clus_bool.values, :, :]
+
+    return np.mean(cohort_attention, axis=0)
 
 
 def get_basic_info(save_fd: str = None, data_info: dict = None):
@@ -104,7 +147,10 @@ def get_basic_info(save_fd: str = None, data_info: dict = None):
     if save_fd is not None:
 
         # Recompute save_fd and makedirs if it does not exist
-        _, model_name, run_num, _ = save_fd.split("/")
+        _, model_data_used, model_name, run_num, _ = save_fd.split("/")
+        assert data_name == model_data_used
+
+        # Update save_fd
         save_fd = f"visualisations/{data_name}/{model_name}/{run_num}/"
 
         if not os.path.exists(save_fd):
@@ -112,15 +158,15 @@ def get_basic_info(save_fd: str = None, data_info: dict = None):
 
         # Consider if it exists and require it to be the same
         if os.path.exists(save_fd + "data_load_config.json"):
-            with open(save_fd + "data_load_config.json", "r") as f:
-                save_config = json.load(f)
+            with open(save_fd + "data_load_config.json", "r") as file:
+                save_config = json.load(file)
                 assert save_config == data_load_config
 
         # Save if it doesn't exist
         else:
-            with open(save_fd + "data_load_config.json", "w+", newline="\n") as f:
-                json.dump(data_load_config, f, indent=4)
-                f.close()
+            with open(save_fd + "data_load_config.json", "w+", newline="\n") as file:
+                json.dump(data_load_config, file, indent=4)
+                file.close()
 
     return save_fd, data_load_config, data_name
 
@@ -174,24 +220,23 @@ def make_group_summaries(input_data: pd.DataFrame, groups_df: pd.DataFrame, id_c
     feats = input_data.columns.tolist()
 
     # Separate into static and temporal feats
-    _, static_vars, time_vars = separate_vars_by_type(feats)
+    _, static_vars, time_vars = _separate_vars_by_type(feats)
 
     # Compute per-group information
-    group_data_dic = get_data_per_group(input_data, groups_df, id_col)
+    group_data_dic = _get_data_per_group(input_data, groups_df, id_col)
 
     # Make summary statistics of static variables
-    summary_info = make_summary_statistics(group_data_dic, static_vars, id_col)
+    summary_info = _make_summary_statistics(group_data_dic, static_vars, id_col)
 
     # Make temporal plots
     nrows, ncols = _nrows_ncols(len(time_vars))
     fig, ax = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=False)
-    ax = make_temporal_trajs(group_data_dic, time_vars, id_col, time_col, ax=ax)
-    plt.show()
+    ax = _make_temporal_trajs(group_data_dic, time_vars, id_col, time_col, ax=ax)
 
     return summary_info, (fig, ax)
 
 
-def separate_vars_by_type(feats: List) -> Tuple[List, List, List]:
+def _separate_vars_by_type(feats: List) -> Tuple[List, List, List]:
     """
     Separate features into id features, time variables and static variables.
 
@@ -237,7 +282,7 @@ def _get_ids_in_group(groups_df: pd.DataFrame, group: Union[int, str]) -> np.arr
     return is_in_group
 
 
-def get_data_per_group(x_data: pd.DataFrame, groups_df: pd.DataFrame, id_col: str) -> dict:
+def _get_data_per_group(x_data: pd.DataFrame, groups_df: pd.DataFrame, id_col: str) -> dict:
     """
     Divide input data into data derived from sub-cohorts as specified by groups_df. This is saved in a dictionary
     indexed by the group names.
@@ -266,7 +311,7 @@ def get_data_per_group(x_data: pd.DataFrame, groups_df: pd.DataFrame, id_col: st
     return output_dic
 
 
-def make_summary_statistics(group_data_dic: Union[pd.DataFrame, dict], feats: Union[str, List[str]], id_col: str):
+def _make_summary_statistics(group_data_dic: Union[pd.DataFrame, dict], feats: Union[str, List[str]], id_col: str):
     """
     Make list of summary statistics of those variables defined by features given input
 
@@ -310,13 +355,19 @@ def make_summary_statistics(group_data_dic: Union[pd.DataFrame, dict], feats: Un
             # Compute mean, std
             mean, std = np.nanmean(feat_dist), np.nanstd(feat_dist)
 
-            # Compute min, 25%, median, 75%, max
-            q_0, q_25, q_50, q_75, q_100 = np.nanquantile(feat_dist, q=[0, 0.25, 0.5, 0.75, 1.0])
+            try:
+                q_0, q_25, q_50, q_75, q_100 = np.nanquantile(feat_dist, q=[0, 0.25, 0.5, 0.75, 1.0])
 
-            # Append to output
-            output.loc[f"{feat} mean", group] = f"{mean:.2f} \u00B1 {std:.2f}"
-            output.loc[f"{feat} IQR", group] = f"{q_50:.2f} ({q_25:.2f} - {q_75:.2f}"
-            output.loc[f"{feat} min-max", group] = f"{q_0:.2f} - {q_100:.2f}"
+                # Append to output
+                output.loc[f"{feat} mean", group] = f"{mean:.2f} \u00B1 {std:.2f}"
+                output.loc[f"{feat} IQR", group] = f"{q_50:.2f} ({q_25:.2f} - {q_75:.2f})"
+                output.loc[f"{feat} min-max", group] = f"{q_0:.2f} - {q_100:.2f}"
+
+            except TypeError:
+
+                output.loc[f"{feat} mean", group] = None
+                output.loc[f"{feat} IQR", group] = None
+                output.loc[f"{feat} min-max", group] = None
 
     return output
 
@@ -348,7 +399,7 @@ def _nrows_ncols(N: int) -> Tuple[int, int]:
     return nrows, ncols
 
 
-def make_temporal_trajs(group_data_dic, feats, id_col, time_col, ax=None):
+def _make_temporal_trajs(group_data_dic, feats, id_col, time_col, ax=None):
     """
     Plot Mean temporal trajectories with standard error on ax given input data, feats list and list of ids.
 

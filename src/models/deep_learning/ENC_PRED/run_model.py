@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split
 
 # Add Directory path if does not exist
 sys.path.append(str(Path(os.path.abspath(__file__)).parents[4]))
-from src.models.benchmarks.ENC_PRED.model import LSTMEP
+from src.models.traditional_clustering.ENC_PRED.model import LSTMEP
 from src.data_processing import data_loading_utils as data_utils
 from src.models import model_utils as utils
 

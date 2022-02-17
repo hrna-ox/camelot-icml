@@ -59,7 +59,7 @@ def visualise_cluster_groups(clus_pred, data_info: dict, save_fd: str, **kwargs)
 
     # Save axes
     fig.savefig(save_fd + "clus_time_feats_avg_trajs.png", dpi=200)
-    plt.close()
+    print(clus_summary_info)
 
     return None
 
@@ -99,7 +99,7 @@ def visualise_data_groups(data_info, **kwargs):
 
     # Save axes
     fig.savefig(save_fd + "time_feats_avg_trajectories.png", dpi=200)
-    plt.close()
+    print(data_outc_info)
 
     return None
 
@@ -141,13 +141,9 @@ def plot_losses(save_fd=None, history=None, data_info:dict = None, **kwargs):
             ax.set_ylabel(f"Loss {loss} (-)")
             ax.set_title(f"Evolution of loss {loss} during training.")
 
-            # Plot
-            plt.show()
-
             # Save figure if save_fd provided
             if save_fd is not None:
                 fig.savefig(save_fd + f"{loss}_evolution.png", dpi=200)
-                plt.close()
 
     # Now do the same for any other loss value objects
     for key, value in kwargs.items():
@@ -164,13 +160,9 @@ def plot_losses(save_fd=None, history=None, data_info:dict = None, **kwargs):
             ax.set_ylabel(f"Loss {key} (-)")
             ax.set_title(f"Evolution of loss {key} during training.")
 
-            # Plot
-            plt.show()
-
             # Save figure if save_fd provided
             if save_fd is not None:
                 fig.savefig(save_fd + f"{key}_evolution.png", dpi=200)
-                plt.close()
 
     return None
 
@@ -206,14 +198,29 @@ def visualise_cluster_assignment(clus_pred, data_info, pis_pred=None, save_fd=No
                       index=data_info["data_properties"]["outc_names"],
                       columns=[f"Clus {k}" for k in np.unique(clus_pred)])
 
-    # Print Contingency Matrix
-    if cm.shape[0] < cm.shape[1]:
-        cm = cm.T
-    print("Contingency Matrix outcomes x clusters: ", cm, sep="\n")
+    # Get data driven phenotypes
+    data_clus_phens = cm / cm.sum(axis=0)
+    data_outc_phens = cm.divide(cm.sum(axis=1), axis=0)
 
-    # Save contingency matrix
+
+    # Save dfs if not None
     if save_fd is not None:
         cm.to_csv(save_fd + "contingency_matrix.csv", index=True, header=True)
+        data_clus_phens.to_csv(save_fd + "data_clus_phens.csv", index=True, header=True)
+        data_outc_phens.to_csv(save_fd + "data_outc_phens.csv", index=True, header=True)
+
+
+    # Print Data driven results
+    if cm.shape[0] < cm.shape[1]:
+        cm = cm.T
+        data_clus_phens = data_clus_phens.T
+        data_outc_phens = data_outc_phens.T
+
+    print("Contingency Matrix outcomes x clusters: ", cm, sep="\n")
+    print("\nClus-normalised data-driven phenotyes: ", data_clus_phens, sep="\n")
+    print("\nOutc-normalised data-driven phenotyes: ", data_outc_phens, sep="\n")
+
+
 
     if pis_pred is not None:
         fig, ax = utils.get_dists_per_clus(pis_pred)
@@ -221,13 +228,9 @@ def visualise_cluster_assignment(clus_pred, data_info, pis_pred=None, save_fd=No
         fig.supxlabel("Clusters")
         fig.supylabel("Prob. Assign.")
 
-        # Plot
-        plt.show()
-
         # Save if save_fd is provided
         if save_fd is not None:
             fig.savefig(save_fd + "pis_distribution_per_clus.png", dpi=200)
-            plt.close()
 
     return None
 
@@ -247,6 +250,7 @@ def visualise_attention_maps(save_fd=None, data_info:dict = None, clus_pred=None
     - Saves attention maps.
     """
     # Save data configuration
+    feats = data_info["data_properties"]["feats"]
     save_fd, data_load_config, data_name = utils.get_basic_info(save_fd=save_fd, data_info=data_info)
 
     # Check if attention weights exist on outputs
@@ -257,6 +261,21 @@ def visualise_attention_maps(save_fd=None, data_info:dict = None, clus_pred=None
             alpha, beta, gamma = values
 
             # Plot attention weights
-            (fig, ax) = utils.plot_attention_map(alpha, beta, clus_pred=clus_pred)
+            (fig1, ax1), (fig2, ax2) = utils.plot_attention(alpha, beta, gamma=gamma, clus_pred=clus_pred, feats=feats)
+
+            # Add suptitles
+            fig1.suptitle("Cluster-wise attention with gamma.")
+            fig1.supxlabel("Time IDs")
+            fig1.supylabel("Features")
+
+            # Same for Fig2
+            fig2.suptitle("Cluster-wise attention with subcohort.")
+            fig2.supxlabel("Time IDs")
+            fig2.supylabel("Features")
+
+            # Save if save_fd
+            if save_fd is not None:
+                fig1.savefig(save_fd + "attention_v1.png", dpi=200)
+                fig2.savefig(save_fd + "attention_v2.png", dpi=200)
 
     return None

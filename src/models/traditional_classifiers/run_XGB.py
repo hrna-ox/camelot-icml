@@ -10,8 +10,8 @@ import itertools
 np.set_printoptions(precision=3, suppress = True)
 
 import utils
-from run_SVM import convert_to_news_format, compute_mode
-from run_SVM import generated_seeds, possible_clusters
+from svm_all import convert_to_news_format, compute_mode
+from svm_all import generated_seeds, possible_clusters
 
 
 

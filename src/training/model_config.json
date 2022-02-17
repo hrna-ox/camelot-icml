@@ -1,27 +1,27 @@
 {
    "model_name": "CAMELOT",
    "num_clusters": 10,
-   "latent_dim": 64,
+   "latent_dim": 16,
    "seed": 2323,
    "name": "CAMELOT",
    "alpha": 0.01,
-   "beta": 0.01,
+   "beta": 0.1,
    "regulariser_params": [
-      0.01,
-      0.01
+      0.1,
+      0.1
    ],
-   "dropout": 0.6,
+   "dropout": 0.9,
    "encoder_params": {
-      "hidden_layers": 2,
-      "hidden_nodes": 30
+      "hidden_layers": 0,
+      "hidden_nodes": 10
    },
    "identifier_params": {
-      "hidden_layers": 2,
-      "hidden_nodes": 30
+      "hidden_layers": 0,
+      "hidden_nodes": 20
    },
    "predictor_params": {
-      "hidden_layers": 2,
-      "hidden_nodes": 30
+      "hidden_layers": 0,
+      "hidden_nodes": 20
    },
    "cluster_rep_lr": 0.001,
    "optimizer_init": "adam",

@@ -16,8 +16,8 @@ from tensorflow.keras import optimizers
 # Auxiliary function
 
 # Loading libraries
-from src.models.benchmarks.ENC_PRED.model_blocks import MLP, LSTMEncoder
-import src.models.benchmarks.ENC_PRED.model_utils as utils
+from src.models.traditional_clustering.ENC_PRED.model_blocks import MLP, LSTMEncoder
+import src.models.traditional_clustering.ENC_PRED.model_utils as utils
 
 # Loss tracking
 L1 = metrics.Mean(name="L1")

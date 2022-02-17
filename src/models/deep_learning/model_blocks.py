@@ -129,12 +129,11 @@ class MLP(Layer):
             self.__setattr__('dropout_layer_' + str(layer_id_), dropout_layer)
 
         # Input and Output layers
-        self.input_layer = Dense(units=self.hidden_nodes, activation=self.activation_fn)
         self.output_layer = Dense(units=self.output_dim, activation=self.output_fn)
 
-    def call(self, inputs, training=True):
+    def call(self, inputs, training=True, **kwargs):
         """Forward pass of layer block."""
-        x_inter = self.input_layer(inputs)
+        x_inter = inputs
 
         # Iterate through hidden layer computation
         for layer_id_ in range(self.hidden_layers):
@@ -323,7 +322,7 @@ class FeatTimeAttention(Layer):
 
         # Update configuration
         config.update({f"{self.name}-units": self.units,
-                       f"{self.name}-activation": self.activation})
+                       f"{self.name}-activation": self.activation_name})
 
         return config
 
@@ -373,22 +372,15 @@ class LSTMEncoder(Layer):
                                   kernel_regularizer=self.regulariser, recurrent_regularizer=self.regulariser,
                                   bias_regularizer=self.regulariser, return_state=False))
 
-        # Input and Output Layers
-        self.input_layer = LSTM(units=self.hidden_nodes, activation=self.state_fn,
-                                recurrent_activation=self.recurrent_fn, return_sequences=True,
-                                dropout=self.dropout, recurrent_dropout=self.recurrent_dropout,
-                                kernel_regularizer=self.regulariser, recurrent_regularizer=self.regulariser,
-                                bias_regularizer=self.regulariser, return_state=False)
-
         self.output_layer = LSTM(units=self.latent_dim, activation=self.state_fn,
                                  recurrent_activation=self.recurrent_fn, return_sequences=self.return_sequences,
                                  dropout=self.dropout, recurrent_dropout=self.recurrent_dropout,
                                  kernel_regularizer=self.regulariser, recurrent_regularizer=self.regulariser,
                                  bias_regularizer=self.regulariser, return_state=False)
 
-    def call(self, inputs, mask=None, training=True):
+    def call(self, inputs, mask=None, training=True, **kwargs):
         """Forward pass of layer block."""
-        x_inter = self.input_layer(inputs)
+        x_inter = inputs
 
         # Iterate through hidden layer computation
         for layer_id_ in range(self.hidden_layers):
@@ -426,7 +418,7 @@ class AttentionRNNEncoder(LSTMEncoder):
         super().__init__(latent_dim=units, return_sequences=True, **kwargs)
         self.feat_time_attention_layer = FeatTimeAttention(units=units, activation=activation)
 
-    def call(self, x, mask=None, training: bool = True):
+    def call(self, x, mask=None, training: bool = True, **kwargs):
         """
         Forward pass of layer block.
 
@@ -440,7 +432,7 @@ class AttentionRNNEncoder(LSTMEncoder):
         """
 
         # Compute LSTM output states
-        latent_reps = super().call(x, mask=mask, training=training)
+        latent_reps = super().call(x, mask=mask, training=training, **kwargs)
 
         # Compute representation through feature time attention layer
         attention_inputs = (x, latent_reps)
@@ -483,4 +475,10 @@ class AttentionRNNEncoder(LSTMEncoder):
 
     def get_config(self):
         """Update configuration for layer."""
-        return super().get_config().update(self.feat_time_attention_layer.get_config())
+        config = super().get_config().copy()
+
+        # Update
+        custom_layer_config = self.feat_time_attention_layer.get_config().copy()
+        config = {**custom_layer_config, **config}
+
+        return config

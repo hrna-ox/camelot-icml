@@ -13,8 +13,8 @@ from sklearn.model_selection import train_test_split
 
 # Add Directory path if does not exist
 sys.path.append(str(Path(os.path.abspath(__file__)).parents[4]))
-from src.models.benchmarks.ATTEP.model import ATTEP
-from src.models.benchmarks.ATTEP.model_utils import get_callbacks
+from src.models.traditional_clustering.ATTEP.model import ATTEP
+from src.models.traditional_clustering.ATTEP.model_utils import get_callbacks
 from src.data_processing import data_loading_utils as data_utils
 from src.models import model_utils as utils
 

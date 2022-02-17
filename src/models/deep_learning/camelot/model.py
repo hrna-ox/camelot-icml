@@ -237,6 +237,7 @@ class CAMELOT(tf.keras.Model):
 
             # Make forward pass
             y_pred, pi = self.forward_pass(x)
+            clus_phens = self.Predictor(rep_vars)
 
             if self.weighted_loss is True:
                 self.loss_weights = model_utils.class_weighting(y)
@@ -244,7 +245,7 @@ class CAMELOT(tf.keras.Model):
             # compute losses
             l_pred = model_utils.l_pred(y, y_pred, weights=self.loss_weights)
             l_enc_id = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.alpha * model_utils.l_dist(pi)
-            l_clus = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.beta * model_utils.l_clus(rep_vars)
+            l_clus = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.beta * model_utils.l_clus(clus_phens)
 
         # Compute gradients
         pred_grad = tape.gradient(target=l_pred, sources=pred_vars)
@@ -274,6 +275,7 @@ class CAMELOT(tf.keras.Model):
 
         # Make forward pass
         y_pred, pi = self.forward_pass(x)
+        clus_phens = self.Predictor(self.cluster_rep_set)
 
         # Update loss weights depending on batch
         if self.weighted_loss is True:
@@ -283,10 +285,9 @@ class CAMELOT(tf.keras.Model):
         l_pred = model_utils.l_pred(y, y_pred, weights=self.loss_weights)
         l_enc_id = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.alpha * model_utils.l_dist(pi)
         l_clus = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.beta * model_utils.l_clus(
-            self.cluster_rep_set)
+            clus_phens)
 
         return {"L_pred": l_pred, "L_clus_id": l_enc_id, "L_clus_sep": l_clus}
-        # return {'L1': val_L1.result(), 'L2': val_L2.result(), 'L3': val_L3.result()}
 
     # Initialisation Methods for Model Training
     def initialise_model(self, data: tuple, val_data: tuple, epochs: int = 100, learning_rate: float = 0.001,
@@ -572,10 +573,10 @@ class CAMELOT(tf.keras.Model):
 
     def get_config(self):
         """Update configuration for layer."""
-        config = super().get_config().copy()
+        config = {}
 
         # Update configuration
-        config.update({f"{self.name}-K": self.K,
+        config.update({f"{self.name}-num_clusters": self.K,
                        f"{self.name}-latent_dim": self.latent_dim,
                        f"{self.name}-output_dim": self.output_dim,
                        f"{self.name}-seed": self.seed,
@@ -588,11 +589,14 @@ class CAMELOT(tf.keras.Model):
         # Update configuration for each model
         config.update(self.Encoder.get_config())
         config.update(self.Predictor.get_config())
-        config.update(self.Selector.get_config())
+        config.update(self.Identifier.get_config())
 
         return config
 
 
+
+CAMELOT_INPUT_PARAMS = ["num_clusters", "latent_dim", "seed", "output_dim", "name", "alpha", "beta", "regulariser_params", "dropout", "encoder_params", "identifier_params",
+                        "predictor_params", "cluster_rep_lr", "optimizer_init", "weighted_loss"]
 class Model(CAMELOT):
     """
     Model Class Wrapper for CAMELOT with train and analyse methods.
@@ -608,7 +612,8 @@ class Model(CAMELOT):
         """
 
         # Useful information
-        self.model_config = {"output_dim": output_dim, **kwargs}
+        relevant_params = {key: value for key, value in kwargs.items() if key in CAMELOT_INPUT_PARAMS}
+        self.model_config = {"output_dim": output_dim, **relevant_params}
         self.run_num = 1
         self.model_name = "CAMELOT"
 
@@ -690,16 +695,23 @@ class Model(CAMELOT):
         _, _, X_test = data_info["X"]
         _, _, y_test = data_info["y"]
         data_properties = data_info["data_properties"]
+        data_load_config = data_info["data_load_config"]
 
         # Source outcome names and patient id info
         id_info = data_info["ids"][-1]
         pat_ids = id_info[:, 0, 0]
         outc_dims = data_properties["outc_names"]
-        save_fd = f"results/{self.model_name}/run{self.run_num}/"
-        track_fd = f"experiments/{self.model_name}/run{self.run_num}/"
+        data_name = data_load_config["data_name"]
+
+        # Define save_fd
+        save_fd = f"results/{data_name}/{self.model_name}/run{self.run_num}/"
+        track_fd = f"experiments/{data_name}/{self.model_name}/run{self.run_num}/"
 
         if not os.path.exists(save_fd):
             os.makedirs(save_fd)
+
+        if not os.path.exists(track_fd):
+            os.makedirs(track_fd)
 
         # Other useful defs
         K = self.K
@@ -728,6 +740,9 @@ class Model(CAMELOT):
         alpha, beta, gamma = self.compute_unnorm_attention_weights(X_test)
         alpha_norm, beta_norm, gamma_norm = self.compute_norm_attention_weights(X_test)
 
+        # Sixth, get configuration
+        all_model_config = self.get_config()
+
         # ----------------------------- Save Output Data --------------------------------
         # Useful objects
         y_pred.to_csv(save_fd + "y_pred.csv", index=True, header=True)
@@ -750,11 +765,16 @@ class Model(CAMELOT):
         save_params = {**data_info["data_load_config"], **self.model_config, **self.training_params}
         with open(save_fd + "config.json", "w+") as f:
             json.dump(save_params, f, indent=4)
-            f.close()
+
 
         with open(track_fd + "config.json", "w+") as f:
             json.dump(save_params, f, indent=4)
-            f.close()
+
+        with open(save_fd + "model_config_length.json", "w+") as f:
+            json.dump(all_model_config, f, indent=4)
+
+        with open(track_fd + "model_config_length.json", "w+") as f:
+            json.dump(all_model_config, f, indent=4)
 
         # Return objects
         outputs_dic = {

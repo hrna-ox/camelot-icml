@@ -160,7 +160,7 @@ class CEClusSeparation(cbck.Callback):
             self.weights = class_weighting(self.y_val)
 
         else:
-            self.weights = np.ones(shape=(self.y_val.get_shape()[0]))
+            self.weights = np.ones(shape=(self.y_val.shape[0]))
 
     def on_epoch_end(self, epoch, *args, **kwargs):
 

@@ -1,4 +1,4 @@
-import src.models.benchmarks.Traditional_classifiers.utils as utils
+import src.models.traditional_clustering.Traditional_classifiers.utils as utils
 import numpy as np
 import pandas as pd
 

@@ -17,10 +17,10 @@ from tensorflow.keras import optimizers
 import sys
 
 # Auxiliary function
-import src.models.benchmarks.ATTEP.model_utils as model_utils
+import src.models.traditional_clustering.ATTEP.model_utils as model_utils
 
 # Loading libraries
-from src.models.benchmarks.ATTEP.model_blocks import MLP, AttentionRNNEncoder
+from src.models.traditional_clustering.ATTEP.model_blocks import MLP, AttentionRNNEncoder
 
 # Loss tracking
 L1 = metrics.Mean(name="L1")
