@@ -43,7 +43,7 @@ VITALS_NAMING_DIC = {"temperature": "TEMP", "heartrate": "HR", "resprate": "RR",
                      "o2sat": "SPO2", "sbp": "SBP", "dbp": "DBP"}
 
 admission_min_count = 3
-vitals_na_threshold = 0.5
+vitals_na_threshold = 0.4
 resampling_rule = "1H"
 admission_min_time_to_outtime = 5
 

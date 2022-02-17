@@ -38,7 +38,7 @@ model_config["output_dim"] = data_info["y"][-1].shape[-1]
 data_name = data_config["data_name"]
 
 "Visualise Data Properties"
-# vis_main.visualise_data_groups(**data_info)
+# vis_main.visualise_data_groups(data_info)
 
 # -------------------------- Loading and Training Model -----------------------------
 
@@ -63,9 +63,10 @@ outputs_dic = model.analyse(data_info)
 # vis_main.visualise_cluster_groups(**outputs_dic, data_info=data_info)
 
 # "Losses where relevant"
-# vis_main.plot_losses(data_name=data_name, history=history, **outputs_dic)
+# vis_main.plot_losses(history=history, **outputs_dic, data_info=data_info)
 
 # "Clus assignments where relevant"
 vis_main.visualise_cluster_assignment(**outputs_dic, data_info=data_info)
 
 # "Attention maps where relevant"
+vis_main.visualise_attention_maps(**outputs_dic, data_info=data_info)

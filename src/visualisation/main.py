@@ -34,12 +34,8 @@ def visualise_cluster_groups(clus_pred, data_info: dict, save_fd: str, **kwargs)
     X, _ = data_info["data_og"]
     data_properties = data_info["data_properties"]
 
-    # Re-define save_fd
-    _, model_name, run_num, _ = save_fd.split("/")
-    save_fd = f"visualisations/{data_properties['data_name']}/{model_name}/{run_num}"
-
-    if not os.path.exists(save_fd):
-        os.makedirs(save_fd)
+    # Save and load config
+    save_fd, data_load_config, data_name = utils.get_basic_info(save_fd=save_fd, data_info=data_info)
 
     # Subset to test set only
     ids_test, id_col = data_info["ids"][-1][:, 0, 0], data_properties["id_col"]
@@ -54,7 +50,7 @@ def visualise_cluster_groups(clus_pred, data_info: dict, save_fd: str, **kwargs)
     # Save configuration if available
     if "model_config" in kwargs.keys():
         # save config
-        with open(save_fd + "data_load_config.json", "w+", newline="\n") as f:
+        with open(save_fd + "model_config.json", "w+", newline="\n") as f:
             json.dump(kwargs["model_config"], f, indent=4)
             f.close()
 
@@ -68,22 +64,21 @@ def visualise_cluster_groups(clus_pred, data_info: dict, save_fd: str, **kwargs)
     return None
 
 
-def visualise_data_groups(data_og, data_properties: dict, data_load_config: dict, **kwargs):
+def visualise_data_groups(data_info, **kwargs):
     """
-    Visualise input data to model given input arrays X_og, y_og, and identifier columns.
+    Visualise input data to model given input data information.
 
     Params:
-    - data_df: tuple of dataframes (X, y) representing cohort data pre-processing transformations.
-    - data_properties: dict of relevant information and objects relevant to processing of data_df. Must include
-    "time_col" and "id_col" key objects.
-    - data_load_config: dict of input parameters for data processing.
+    - data_info: dict, with patient data information.
 
     Returns:
     - Visualises input data trajectories and summaries.
     - saves to relevant path with load configuration.
     """
     # Unpack input data
-    X, y = data_og
+    X, y = data_info["data_og"]
+    data_properties = data_info["data_properties"]
+    data_load_config = data_info["data_load_config"]
 
     data_outc_info, (fig, axs) = utils.make_group_summaries(X, y, **data_properties)
 
@@ -109,14 +104,14 @@ def visualise_data_groups(data_og, data_properties: dict, data_load_config: dict
     return None
 
 
-def plot_losses(data_name: str, save_fd=None, history=None, **kwargs):
+def plot_losses(save_fd=None, history=None, data_info:dict = None, **kwargs):
     """
     Plot losses if:
     a) history object has been provided (useful for neural networks)
     b) any loss output has been provided.
 
     Params:
-    - data_name: str, name of dataset for which results are being computed.
+    - data_info: dictionary with input data information
     - save_fd: save_folder for figures. defaults to None, which does not save plots.
     - history: Tensorflow history object with information about loss functions during training. If None, ignores this
     parameter. (Default = None)
@@ -125,15 +120,7 @@ def plot_losses(data_name: str, save_fd=None, history=None, **kwargs):
     Returns:
         - Plot loss functions for all key values containing the expression loss.
     """
-
-    if save_fd is not None:
-
-        # Recompute save_fd and makedirs if it does not exist
-        _, model_name, run_num, _ = save_fd.split("/")
-        save_fd = f"visualisations/{data_name}/{model_name}/{run_num}/"
-
-        if not os.path.exists(save_fd):
-            os.makedirs(save_fd)
+    save_fd, data_load_config, data_name = utils.get_basic_info(save_fd=save_fd, data_info=data_info)
 
     # Identify main training losses and plot if they exist
     if history is not None:
@@ -208,15 +195,7 @@ def visualise_cluster_assignment(clus_pred, data_info, pis_pred=None, save_fd=No
     """
     # Get y_test
     labels_true = np.argmax(data_info["y"][-1], axis=1)
-    data_name = data_info["data_load_config"]["data_name"]
-
-    # Get right save_fd
-    if save_fd is not None:
-        _, model_name, run_num, _ = save_fd.split("/")
-        save_fd = f"visualisations/{data_name}/{model_name}/{run_num}/"
-
-        if not os.path.exists(save_fd):
-            os.makedirs(save_fd)
+    save_fd, data_load_config, data_name = utils.get_basic_info(save_fd, data_info=data_info)
 
     # Check if pis_pred exist
     if pis_pred is not None:
@@ -250,6 +229,32 @@ def visualise_cluster_assignment(clus_pred, data_info, pis_pred=None, save_fd=No
             fig.savefig(save_fd + "pis_distribution_per_clus.png", dpi=200)
             plt.close()
 
+    return None
 
-def visualise_attention():
-    pass
+
+def visualise_attention_maps(save_fd=None, data_info:dict = None, clus_pred=None, **kwargs):
+    """
+    Plot attention maps if those are provided.
+
+    Params:
+    - save_fd: str, of where results have been saved.
+    - data_info: dict, dictionary of input data information.
+    - clus_pred: pd.DataFrame, array-like of categorical cluster assignment.
+    - **kwargs: other output results. Any attention weights are saved under "**attention**" keys.
+
+    Returns:
+    - Plot of attention maps.
+    - Saves attention maps.
+    """
+    # Save data configuration
+    save_fd, data_load_config, data_name = utils.get_basic_info(save_fd=save_fd, data_info=data_info)
+
+    # Check if attention weights exist on outputs
+    for key, values in kwargs.items():
+        if ("attention" in key or "att" in key) and ("unnorm" not in key):
+
+            # Load weights
+            alpha, beta, gamma = values
+
+            # Plot attention weights
+            (fig, ax) = utils.plot_attention_map(alpha, beta, clus_pred=clus_pred)

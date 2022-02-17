@@ -2,29 +2,11 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="e4ecba8e-2901-44aa-817c-245a30485212" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/src/models/model_utils.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/results/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/results/evaluate" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data_processing/MIMIC/test.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_processing/MIMIC/test.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/evaluate_results" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/README.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/AC-TPC/run-actpc.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/AC-TPC/run-actpc.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/ATTEP/model_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/ATTEP/model_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/ATTEP/run_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/ATTEP/run_model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/ENC_PRED/model_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/ENC_PRED/model_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/ENC_PRED/run_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/ENC_PRED/run_model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/camelot/camelot_default_config.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/camelot/camelot_default_config.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/camelot/model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/camelot/model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/camelot/model_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/camelot/model_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/training/data_loader.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_processing/data_loader.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/training/data_loading_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_processing/data_loading_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/training/model_config.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/training/model_config.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data_processing/MIMIC/vitals_processing.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_processing/MIMIC/vitals_processing.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/training/run_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/training/run_model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/training/training_config.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/training/training_config.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/training/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/results/results_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/visualisation/vis_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/visualisation/vis_utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/visualisation/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/visualisation/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/visualisation/visualisation_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/visualisation/visualisation_utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -60,7 +42,7 @@
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/src/results" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
@@ -75,8 +57,8 @@
       <recent name="C:\Users\hruia\PycharmProjects\camelot-icml\src\models\deep_learning" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.run_model">
-    <configuration name="admissions_processing" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
+  <component name="RunManager">
+    <configuration name="mimic-process" type="PythonConfigurationType" factoryName="Python">
       <module name="camelot-icml" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -89,7 +71,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/data_processing/MIMIC/admissions_processing.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/data_processing/MIMIC/run_processing.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -98,78 +80,6 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="run_model" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
-      <module name="camelot-icml" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="C:\Users\hruia\Anaconda3\envs\camelot-icml\python.exe" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
-      <option name="IS_MODULE_SDK" value="false" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="C:\Users\hruia\PycharmProjects\camelot-icml\src\training\run_model.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="targets_processing" type="PythonConfigurationType" factoryName="Python">
-      <module name="camelot-icml" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="C:\Users\hruia\Anaconda3\envs\camelot-icml\python.exe" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
-      <option name="IS_MODULE_SDK" value="false" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="C:\Users\hruia\PycharmProjects\camelot-icml\src\data_processing\MIMIC\outcomes_processing.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="vitals_processing" type="PythonConfigurationType" factoryName="Python">
-      <module name="camelot-icml" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="C:\Users\hruia\Anaconda3\envs\camelot-icml\python.exe" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
-      <option name="IS_MODULE_SDK" value="false" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/data_processing/MIMIC/vitals_processing.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <list>
-      <item itemvalue="Python.admissions_processing" />
-      <item itemvalue="Python.run_model" />
-      <item itemvalue="Python.targets_processing" />
-      <item itemvalue="Python.vitals_processing" />
-    </list>
   </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
@@ -184,6 +94,7 @@
       <workItem from="1644488874682" duration="21335000" />
       <workItem from="1644572177816" duration="4911000" />
       <workItem from="1644929700541" duration="10238000" />
+      <workItem from="1645093877819" duration="4466000" />
     </task>
     <servers />
   </component>
@@ -257,27 +168,33 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/src/data_processing/data_loading_utils.py</url>
-          <line>462</line>
+          <line>505</line>
           <option name="timeStamp" value="17" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/src/data_processing/data_loading_utils.py</url>
-          <line>239</line>
+          <line>281</line>
           <option name="timeStamp" value="18" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/src/results/evaluate</url>
-          <line>15</line>
-          <option name="timeStamp" value="19" />
+          <url>file://$PROJECT_DIR$/src/models/deep_learning/camelot/model.py</url>
+          <line>572</line>
+          <option name="timeStamp" value="21" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/src/visualisation/main.py</url>
+          <line>177</line>
+          <option name="timeStamp" value="22" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/camelot_icml$run_model.coverage" NAME="run_model Coverage Results" MODIFIED="1644944700754" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/camelot_icml$run_model.coverage" NAME="run_model Coverage Results" MODIFIED="1645095472090" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/camelot_icml$admissions_processing.coverage" NAME="admissions_processing Coverage Results" MODIFIED="1643548941711" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/camelot_icml$vitals_processing.coverage" NAME="vitals_processing Coverage Results" MODIFIED="1643569467121" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/camelot_icml$targets_processing.coverage" NAME="targets_processing Coverage Results" MODIFIED="1643576233116" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/camelot_icml$single_run.coverage" NAME="single_run Coverage Results" MODIFIED="1643637092282" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/camelot_icml$mimic_process.coverage" NAME="mimic-process Coverage Results" MODIFIED="1645095565160" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>

@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
 import seaborn as sns
 
-import json
+import json, os
 from typing import Union, List, Tuple
 
 from src.data_processing.data_loading_utils import _is_temporal_feat, _is_id_feat, _is_static_feat
@@ -23,6 +23,107 @@ with open("data/HAVEN/processed/units_dic.json", "r") as f:
 with open("data/MIMIC/processed/units_dic.json", "r") as f:
     UNITS_DIC = {**UNITS_DIC, **json.load(f)}
     f.close()
+
+
+def plot_attention(alpha, beta, gamma, clus_pred = None):
+    """
+    Plot attention maps given alpha, beta maps and predicted cluster maps.
+
+    Params:
+    - alpha, beta: alpha, beta attention weights.
+    - clus_pred: array-like of shape (N, ) with categorical cluster assignment.
+
+    Returns: Tuple of tuple of (fig, ax) objects representing:
+        - general alpha, beta, gamma for cluster membership.
+        - alpha, beta attention maps for cluster cohorts identified in clus_pred.
+    """
+    # Compute number of clusters
+    K = gamma.shape[1]
+    nrows, ncols = _nrows_ncols(K)
+
+    # Initialise plot 1
+    fig1, ax1 = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=True)
+    axes1 = ax1.reshape(-1)
+
+    # Iterate over clusters
+    for k in range(K):
+
+        # first version of attention map computation
+        gamma_k = gamma[:, k, :]
+        heatmap_k = _get_attention_v1(alpha, beta, gamma_k)
+
+        # Plot map
+        # sns.heatmap()
+
+    return None
+
+
+def _get_attention_v1(alpha, beta, gamma_k):
+    """
+    Attention maps computation version 1.
+
+    Params:
+    - alpha: attention weights of shape (N, T, D_f)
+    - beta: attention weights of shape (1, T, 1)
+    - gamma_k: cluster k attention weights of shape (N, D_f)
+
+    Returns:
+    - heatmaps array of shape: (K, T, D_f) with the resulting average attention weights.
+    """
+    # Get time multiplication
+    per_pat_time_feat_map = np.multiply(alpha, beta)                      # shape (N, T, D_f)
+
+    # Approximate by cluster
+    cohort_attention = np.multiply(per_pat_time_feat_map, np.expand_dims(gamma_k, axis=1))       # shape (N, T, D_f)
+
+    return np.mean(cohort_attention, axis=0)
+
+
+
+def get_basic_info(save_fd: str = None, data_info: dict = None):
+    """
+    Given input data information, given in data_info, and save_fd, re-compute save_fd for visualisation folder,
+    save config and get data_name.
+
+    Params:
+    - save_fd: str, where results are currently saved. If save_fd is None, return None. If not None, then re-compute
+    save_fd to the visualisation folder.
+    - data_info: dict, with input data basic information.
+
+    Returns:
+    - save_fd: re-computed save_fd for visualisation.
+    - data_config: list of data_configuration parameters for this input data.
+    - data_name: data_name of this dataset.
+    """
+
+    # Data configuration and name
+    data_load_config = data_info["data_load_config"]
+    data_name = data_load_config["data_name"]
+
+    # Re-compute save_fd if it was provided
+    if save_fd is not None:
+
+        # Recompute save_fd and makedirs if it does not exist
+        _, model_name, run_num, _ = save_fd.split("/")
+        save_fd = f"visualisations/{data_name}/{model_name}/{run_num}/"
+
+        if not os.path.exists(save_fd):
+            os.makedirs(save_fd)
+
+        # Consider if it exists and require it to be the same
+        if os.path.exists(save_fd + "data_load_config.json"):
+            with open(save_fd + "data_load_config.json", "r") as f:
+                save_config = json.load(f)
+                assert save_config == data_load_config
+
+        # Save if it doesn't exist
+        else:
+            with open(save_fd + "data_load_config.json", "w+", newline="\n") as f:
+                json.dump(data_load_config, f, indent=4)
+                f.close()
+
+    return save_fd, data_load_config, data_name
+
 
 
 def plot_loss_fn(train_values: List, val_values: List):
