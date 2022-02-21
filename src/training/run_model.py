@@ -5,7 +5,7 @@ Date Last updated: 24 Jan 2022
 Author: Henrique Aguiar
 Please contact via henrique.aguiar@eng.ox.ac.uk
 """
-import json, sys
+import json, sys, os
 import matplotlib.pyplot as plt
 
 from src.data_processing.data_loader import data_loader
@@ -13,13 +13,13 @@ import src.models.model_utils as model_utils
 from src.results.main import evaluate
 import src.visualisation.main as vis_main
 
+
 # physical_devices = tf.config.list_physical_devices('GPU')
 # tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-# os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 def main():
-
     # ---------------------------- Load Configurations --------------------------------------
     with open("src/training/data_config.json", "r") as f:
         data_config = json.load(f)
@@ -37,8 +37,6 @@ def main():
 
     "Data Loading."
     data_info = data_loader(**data_config)
-    model_config["output_dim"] = data_info["y"][-1].shape[-1]
-    model_config["D_f"] = data_info["X"][-1].shape[-1]
 
     "Visualise Data Properties"
     vis_main.visualise_data_groups(data_info)
@@ -54,7 +52,7 @@ def main():
 
     "Compute results on test data"
     outputs_dic = model.analyse(data_info)
-
+    print(outputs_dic.keys())
 
     # -------------------------------------- Evaluate Scores --------------------------------------
 
@@ -82,6 +80,7 @@ def main():
     print("Analysis Complete.")
     plt.show()
     sys.exit()
+
 
 if __name__ == "__main__":
     main()

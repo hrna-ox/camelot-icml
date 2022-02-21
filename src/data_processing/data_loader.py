@@ -74,3 +74,7 @@ def data_loader(data_name: str = "MIMIC", feat_set: Union[List, str] = "vit", ti
               }
 
     return output
+
+
+def nested_cv_loader():
+    pass

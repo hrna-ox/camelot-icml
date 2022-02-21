@@ -12,7 +12,7 @@ import pandas as pd
 from typing import Union, List
 
 from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
-from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
+from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score, confusion_matrix
 from sklearn.metrics import roc_auc_score, f1_score, recall_score, precision_score
 from sklearn.metrics.cluster import contingency_matrix
 
@@ -116,18 +116,18 @@ def purity(y_true: np.ndarray, clus_pred: np.ndarray) -> float:
     """
 
     # Convert clus_pred to categorical cluster assignments
-    confusion_matrix = get_clus_outc_numbers(y_true, clus_pred)    # shape (num_outcs, num_clus)
+    cm = get_clus_outc_numbers(y_true, clus_pred)  # shape (num_outcs, num_clus)
 
     # Number of most common class in each cluster
-    max_class_numbers = np.amax(confusion_matrix, axis=0)
+    max_class_numbers = np.amax(cm, axis=0)
 
     # Compute average
-    purity_score = np.sum(max_class_numbers) / np.sum(confusion_matrix)
+    purity_score = np.sum(max_class_numbers) / np.sum(cm)
 
     return purity_score
 
 
-def compute_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
+def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
     """
     Compute set of supervised classification scores between y_true and y_pred. List of metrics includes:
     a) AUROC, b) Recall, c) F1, d) Precision, e) Adjusted Rand Index and f) Normalised Mutual Information Score.
@@ -169,6 +169,9 @@ def compute_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
     # Compute NMI
     nmi = normalized_mutual_info_score(labels_true, labels_pred)
 
+    # Compute Confusion matrix
+    cm = confusion_matrix(y_true=labels_true, y_pred=labels_pred, labels=None, sample_weight=None, normalize=None)
+
     # Return Dictionary
     scores_dic = {
         "ROC-AUC": auc,
@@ -179,7 +182,57 @@ def compute_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
         "NMI": nmi
     }
 
-    return scores_dic
+    return scores_dic, cm
+
+
+def compute_from_eas_scores(y_true: np.ndarray, scores: np.ndarray, outc_names: np.ndarray = None, **kwargs) -> dict:
+    """
+    Compute supervised performance metrics given input array scores.
+
+    Params:
+    - y_true: array-like of shape (N, num_outcs).
+    - scores: array-like of shape (N, ).
+    - outc_names: array-like of shape (num_outcs, ) with particular outcome names.
+    - kwargs: any other arguments. They are kept for coherence.
+
+    Returns:
+    - dict with scores ROC-AUC, F1, Recall, Precision per class
+    """
+
+    # Useful infos
+    num_outcs = y_true.shape[-1]
+
+    if outc_names is None:
+        outc_names = range(num_outcs)
+
+    # Useful info and initialise output
+    SCORE_NAMES = {"ROC-AUC": roc_auc_score, "F1": f1_score, "Recall": recall_score, "Precision": precision_score}
+    output_dic = {}
+
+    # Convert to useful format
+    if isinstance(scores, pd.Series) or isinstance(scores, pd.DataFrame):
+        scores = scores.values.reshape(-1)
+
+    # Convert scores to probability thresholds
+    scores_max = np.max(scores)
+    scores = scores / scores_max
+
+    # Iterate through the 4 binary scores
+    for score_name, score_fn in SCORE_NAMES.items():
+
+        # Get scoring fn
+        scoring_fn = SCORE_NAMES[score_name]
+        output_dic[score_name] = []
+
+        # Iterate over outcomes
+        for outc_id, outc in enumerate(outc_names):
+
+            # Compute score for this particular outcome
+            outc_labels_true = y_true[:, outc_id] == 1
+            output_dic[score_name].append(scoring_fn(outc_labels_true.astype(int), scores))
+
+    # Return object
+    return output_dic
 
 
 def compute_cluster_performance(X, clus_pred, y_true):

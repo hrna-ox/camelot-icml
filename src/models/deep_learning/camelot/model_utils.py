@@ -18,7 +18,7 @@ from sklearn.metrics import roc_auc_score as roc
 # ----------------------------------------------------------------------------------
 "Utility Functions and Global Params"
 
-LOGS_DIR = "experiments/CAMELOT/"
+LOGS_DIR = "experiments/"
 
 
 def tf_log(tensor):
@@ -393,8 +393,9 @@ def cbck_list(summary_name: str, interval: int = 5, validation_data: tuple = ())
     return extra_callback_list
 
 
-def get_callbacks(validation_data, data_name: str, track_loss: str, interval: int = 5, other_cbcks: str = "", early_stop: bool = True,
-                  lr_scheduler: bool = True, tensorboard: bool = True, min_delta: float = 0.0001, patience: int = 200):
+def get_callbacks(validation_data, data_name: str, track_loss: str, interval: int = 5, other_cbcks: str = "",
+                  early_stop: bool = True, lr_scheduler: bool = True, tensorboard: bool = True,
+                  min_delta: float = 0.0001, patience_epochs: int = 200):
     """
     Generate complete list of callbacks given input configuration.
 
@@ -408,7 +409,7 @@ def get_callbacks(validation_data, data_name: str, track_loss: str, interval: in
         - lr_scheduler: dynamically update learning rate. (default = True)
         - tensorboard: write tensorboard friendly logs which can then be visualised. (default = True)
         - min_delta: if early stopping, the interval on which to check improvement or not.
-        - patience: how many epochs to wait until checking for improvements.
+        - patience_epochs: how many epochs to wait until checking for improvements.
         """
 
     # Initialise empty
@@ -449,7 +450,7 @@ def get_callbacks(validation_data, data_name: str, track_loss: str, interval: in
     # Check if Early stoppage is added
     if early_stop is True:
         callbacks.append(cbck.EarlyStopping(monitor='val_' + track_loss, mode="min", restore_best_weights=True,
-                                            min_delta=min_delta, patience=patience))
+                                            min_delta=min_delta, patience=patience_epochs))
 
     # Check if LR Scheduling is in place
     if lr_scheduler is True:

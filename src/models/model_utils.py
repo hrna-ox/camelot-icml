@@ -12,6 +12,7 @@ from src.models.traditional_classifiers.svm_per_feat import SVMFeat
 from src.models.traditional_classifiers.xgb_all import XGBAll
 from src.models.traditional_classifiers.xgb_per_feat import XGBFeat
 from src.models.traditional_clustering.TSKM import TSKM
+from src.models.traditional_classifiers.news import NEWS
 
 
 def get_model_from_str(model_name, **kwargs):
@@ -41,6 +42,9 @@ def get_model_from_str(model_name, **kwargs):
 
     elif "tskm" in model_name.lower():
         model = TSKM(**kwargs)
+
+    elif "news" in model_name.lower():
+        model = NEWS(**kwargs)
 
     else:
         raise ValueError(f"Correct Model name not specified. Value {model_name} given.")

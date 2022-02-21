@@ -9,10 +9,10 @@ import pandas as pd
 
 from xgboost import XGBClassifier as XGBClassifier
 
-XGBOOST_INPUT_PARAMS = ["n_estimator", "depth", "objective", "gamma", "learning_rate", "use_label_encoder"]
+XGBOOST_INPUT_PARAMS = ["n_estimators", "depth", "objective", "gamma", "learning_rate", "use_label_encoder"]
 
 
-class XGBAll(XGBClassifier):
+class XGBAll:
     """
     Model Class Wrapper for a XGBoost model.
     """
@@ -27,20 +27,21 @@ class XGBAll(XGBClassifier):
         """
 
         # Get proper model_config
-        self.model_config = {key: value for key, value in kwargs.items() if key in XGBOOST_INPUT_PARAMS}
+        model_config = {key: value for key, value in kwargs.items() if key in XGBOOST_INPUT_PARAMS}
 
         if "seed" in kwargs.keys():
-            self.model_config["random_state"] = kwargs["seed"]
+            model_config["random_state"] = kwargs["seed"]
+
+        # Initialise model
+        self.model = XGBClassifier(verbosity=1, **model_config, use_label_encoder=False)
 
         # Initialise other useful information
         self.run_num = 1
-        self.model_name = "XGBOOST"
+        self.model_name = "XGBALL"
 
         # Useful for consistency
+        self.model_config = model_config
         self.training_params = {}
-
-        # Initialise model
-        super().__init__(verbosity=True, **self.model_config)
 
     def train(self, data_info, **kwargs):
         """
@@ -75,7 +76,7 @@ class XGBAll(XGBClassifier):
         X = X_train.reshape(X_train.shape[0], -1)
         y = np.argmax(y_train, axis=1)
 
-        self.fit(X, y)
+        self.model.fit(X, y)
 
         return None
 
@@ -120,7 +121,7 @@ class XGBAll(XGBClassifier):
 
         # Flatten and make probability
         X_test = X_test.reshape(pat_ids.size, -1)
-        output_test = self.predict_proba(X_test)
+        output_test = self.model.predict_proba(X_test)
 
         # First, compute predicted y estimates
         y_pred = pd.DataFrame(output_test, index=pat_ids, columns=outc_dims)

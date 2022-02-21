@@ -10,6 +10,8 @@ from scipy import stats
 import numpy as np
 import pandas as pd
 
+from src.data_processing.data_loading_utils import _is_id_feat
+
 SVMFEAT_INPUT_PARAMS = ["C", "kernel", "degree", "gamma", "coef0", "shrinking", "probability", "tol", "class_weight",
                         "random_state", "verbose"]
 
@@ -28,11 +30,12 @@ class SVMFeat:
         - kwargs: model configuration parameters
         """
         # Get dimensionality
-        D_f = data_info["X"][-1].shape[-1]
+        feats = [feat for feat in data_info["data_properties"]["feats"] if not _is_id_feat(feat)]
 
         # Get proper model_config
         self.model_config = {key: value for key, value in kwargs.items() if key in SVMFEAT_INPUT_PARAMS}
-        self.D_f = D_f
+        self.feats = feats
+        self.D_f = len(self.feats)
 
         if "probability" not in self.model_config.keys():
             self.model_config["probability"] = probability
@@ -46,7 +49,7 @@ class SVMFeat:
 
         # Get ensemble
         self.models_per_feat = {
-            feat: SVC(**self.model_config, verbose=True) for feat in range(D_f)
+            feat: SVC(**self.model_config, verbose=True) for feat in self.feats
         }
 
     def train(self, data_info, **kwargs):
@@ -78,9 +81,12 @@ class SVMFeat:
         X_train = np.concatenate((X_train, X_val), axis=0)
         y_train = np.concatenate((y_train, y_val), axis=0)
 
-        for feat_id in range(self.D_f):
+        # Convert to categorical
+        labels_train = np.argmax(y_train, axis=1)
+
+        for feat_id, feat in enumerate(self.feats):
             # Fit model to corresponding feature
-            self.models_per_feat[feat_id].fit(X_train[:, :, feat_id], y_train, sample_weight=None)
+            self.models_per_feat[feat].fit(X_train[:, :, feat_id], labels_train, sample_weight=None)
 
         return None
 
@@ -128,9 +134,10 @@ class SVMFeat:
 
             # Initialise output array
             output_test = np.zeros(shape=y_test.shape)
-            for feat_id in range(self.D_f):
+            for feat_id, feat in enumerate(self.feats):
+
                 # Compute probability for feature
-                output_feat = self.models_per_feat[feat_id].predict_proba(X_test[:, :, feat_id])
+                output_feat = self.models_per_feat[feat].predict_proba(X_test[:, :, feat_id])
                 output_test += output_feat
 
             # Take average
@@ -141,8 +148,8 @@ class SVMFeat:
             # Initialise placeholder array - each column keeps track of predicted Class
             placeholder = np.zeros(shape=y_test.shape)
 
-            for feat_id in range(self.D_f):
-                output_feat = self.models_per_feat[feat_id].predict(X_test[:, :, feat_id])
+            for feat_id, feat in enumerate(self.feats):
+                output_feat = self.models_per_feat[feat].predict(X_test[:, :, feat_id])
 
                 # Append to placeholder
                 placeholder[:, feat_id] = output_feat
@@ -159,8 +166,8 @@ class SVMFeat:
         y_true = pd.DataFrame(y_test, index=pat_ids, columns=outc_dims)
 
         # Second, get configuration
-        model_config_all = {feat_id: self.models_per_feat[feat_id].get_params(deep=False) for feat_id in
-                            range(self.D_f)}
+        model_config_all = {feat: self.models_per_feat[feat].get_params(deep=False) for feat in
+                            self.feats}
 
         # ----------------------------- Save Output Data --------------------------------
         # Useful objects

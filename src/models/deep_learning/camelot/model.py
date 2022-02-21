@@ -360,7 +360,7 @@ class CAMELOT(tf.keras.Model):
 
     # Initialisation Methods for Model Training
     def initialise_model(self, data: tuple, val_data: tuple, epochs: int = 100, learning_rate: float = 0.001,
-                         batch_size: int = 64, **kwargs):
+                         batch_size: int = 64, patience_epochs: int = 200, **kwargs):
         """
         Initialisation Method for Model.
 
@@ -374,6 +374,7 @@ class CAMELOT(tf.keras.Model):
             - epochs: int, number of epochs for training. (default = 100)
             - learning_rate: float, starting learning rate for initialisation training
             - batch_size: int, size of individual batches.
+            - patience_epochs: int, number of epochs to wait until improvement is seen.
             - kwargs: dictionary arguments for KMeans initialisation.
 
         Updates model according to initialisation procedure. Initialisation consists of 3 steps:
@@ -394,16 +395,18 @@ class CAMELOT(tf.keras.Model):
         self._optimizer_init.learning_rate = learning_rate
 
         # Go through initialisation steps
-        self._initialise_enc_pred(data=data, val_data=val_data, epochs=epochs, batch_size=batch_size)
+        self._initialise_enc_pred(data=data, val_data=val_data, epochs=epochs, batch_size=batch_size,
+                                  patience_epochs=patience_epochs)
         clus_train_y, clus_val_y = self._initialise_clus(x, val_x, **kwargs)
 
         # Initialise Identifier
         iden_train_data = (x, clus_train_y)
         iden_val_data = (val_x, clus_val_y)
         self._initialise_iden(data=iden_train_data, val_data=iden_val_data,
-                              epochs=epochs, batch_size=batch_size)
+                              epochs=epochs, batch_size=batch_size, patience_epochs=patience_epochs)
 
-    def _initialise_enc_pred(self, data, val_data, epochs=100, batch_size=64):
+    def _initialise_enc_pred(self, data, val_data, epochs=100, batch_size=64,
+                             patience_epochs=200):
         """
           Initialisation Method for Encoder and Predictor blocks.
 
@@ -465,7 +468,7 @@ class CAMELOT(tf.keras.Model):
                 epoch, epoch_loss / step_, loss_val))
 
             # Check if result hasn't improved for 2 epochs
-            if epoch > 300 and loss_val >= self.enc_pred_loss_tracker.iloc[-300:-1, -1].min():
+            if epoch > patience_epochs and loss_val >= self.enc_pred_loss_tracker.iloc[-patience_epochs:-1, -1].min():
                 break
 
             self.enc_pred_loss_tracker.loc[epoch + 1, :] = [epoch_loss / step_, loss_val]
@@ -514,7 +517,7 @@ class CAMELOT(tf.keras.Model):
 
         return clus_train_y.astype(np.float32), clus_val_y.astype(np.float32)
 
-    def _initialise_iden(self, data, val_data, epochs=100, batch_size=64):
+    def _initialise_iden(self, data, val_data, epochs=100, batch_size=64, patience_epochs=200):
         """
           Initialisation Method for Identifier Network
 
@@ -576,7 +579,7 @@ class CAMELOT(tf.keras.Model):
                 epoch, epoch_loss / step_, loss_val))
 
             # Check if result hasn't improved for 2 epochs
-            if epoch > 1000 and loss_val >= self.iden_loss_tracker.iloc[-1000:-1, -1].min():
+            if epoch > patience_epochs and loss_val >= self.iden_loss_tracker.iloc[-patience_epochs:-1, -1].min():
                 break
 
             self.iden_loss_tracker.loc[epoch + 1, :] = [epoch_loss / step_, loss_val]
@@ -702,7 +705,7 @@ class Model(CAMELOT):
         super().__init__(**self.model_config)
 
     def train(self, data_info, lr: float = 0.001, epochs_init: int = 100, epochs: int = 100, bs: int = 32,
-              cbck_str: str = "auc-sup-scores-cm", **kwargs):
+              patience_epochs: int = 200, cbck_str: str = "auc-sup-scores-cm", **kwargs):
         """
         Fit method for training CAMELOT model.
 
@@ -713,12 +716,14 @@ class Model(CAMELOT):
         - "epochs": number of epochs for main.py training (default = 100)
         - "bs": batch size (default = 32)
         - "cbck_str": callback_string indicating callbacks to print during training (default: "auc-sup-scores-cm)
+        - "patience_epochs": int, maximum number of epochs to wait for improvement. (default=200)
         """
         self.training_params = {
             "lr": lr,
             "epochs_init": epochs_init,
             "epochs": epochs,
             "bs": bs,
+            "patience_epochs": patience_epochs,
             "cbck_str": cbck_str
         }
 
@@ -741,14 +746,16 @@ class Model(CAMELOT):
         # Train model on initialisation procedure
         print("-" * 20, "\n", "Initialising Model", sep="\n")
         self.initialise_model(data=(X_train, y_train), val_data=(X_val, y_val), epochs=epochs_init,
-                              learning_rate=lr, batch_size=bs)
+                              learning_rate=lr, batch_size=bs, patience_epochs=patience_epochs)
 
         # Main Training phase
         print("-" * 20, "\n", "STARTING MAIN TRAINING PHASE")
         callbacks, run_num = model_utils.get_callbacks((X_val, y_val), data_name=data_name, track_loss="L_pred",
-                                                       other_cbcks=cbck_str,
+                                                       other_cbcks=cbck_str, patience_epochs=patience_epochs,
                                                        early_stop=True, lr_scheduler=True, tensorboard=True)
         self.run_num = run_num
+
+        # Fit model
         history = self.fit(x=X_train, y=y_train, validation_data=(X_val, y_val), batch_size=bs, epochs=epochs,
                            verbose=2, callbacks=callbacks, **kwargs)
 

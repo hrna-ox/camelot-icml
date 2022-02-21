@@ -9,6 +9,8 @@ import pandas as pd
 
 from xgboost import XGBClassifier as XGBClassifier
 
+from src.data_processing.data_loading_utils import _is_id_feat
+
 XGBOOST_INPUT_PARAMS = ["n_estimator", "depth", "objective", "gamma", "learning_rate", "use_label_encoder"]
 
 
@@ -26,25 +28,26 @@ class XGBFeat:
         - kwargs: model configuration parameters
         """
         # Get dimensionality
-        D_f = data_info["X"][-1].shape[-1]
+        feats = data_info["data_properties"]["feats"]
 
         # Get proper model_config
         self.model_config = {key: value for key, value in kwargs.items() if key in XGBOOST_INPUT_PARAMS}
 
         if "seed" in kwargs.keys():
             self.model_config["random_state"] = kwargs["seed"]
-        self.D_f = D_f
+        self.feats = [feat for feat in feats if not _is_id_feat(feat)]
+        self.D_f = len(self.feats)
 
         # Initialise other useful information
         self.run_num = 1
-        self.model_name = "XGBOOST"
+        self.model_name = "XGBFEAT"
 
         # Useful for consistency
         self.training_params = {}
 
         # Get ensemble
         self.models_per_feat = {
-            feat: XGBClassifier(verbosity=True, **self.model_config) for feat in range(D_f)
+            feat: XGBClassifier(verbosity=1, **self.model_config) for feat in self.feats
         }
 
     def train(self, data_info, **kwargs):
@@ -76,9 +79,13 @@ class XGBFeat:
         X_train = np.concatenate((X_train, X_val), axis=0)
         y_train = np.concatenate((y_train, y_val), axis=0)
 
-        for feat_id in range(self.D_f):
+        # Convert to categorical labels
+        y = np.argmax(y_train, axis=1)
+
+        for feat_id, feat in enumerate(self.feats):
+            print(feat, feat_id)
             # Fit model to corresponding feature
-            self.models_per_feat[feat_id].fit(X_train[:, :, feat_id], y_train, sample_weight=None)
+            self.models_per_feat[feat].fit(X_train[:, :, feat_id], y, sample_weight=None)
 
         return None
 
@@ -123,13 +130,14 @@ class XGBFeat:
 
         # Initialise output array for computing mean over variables
         output_test = np.zeros(shape=y_test.shape)
-        for feat_id in range(self.D_f):
+        for feat_id, feat in enumerate(self.feats):
+
             # Compute probability for feature
-            output_feat = self.models_per_feat[feat_id].predict_proba(X_test[:, :, feat_id])
+            output_feat = self.models_per_feat[feat].predict_proba(X_test[:, :, feat_id])
             output_test += output_feat
 
         # Take average
-        output_test = output_test / self.D_f
+        output_test = output_test / len(self.feats)
 
         # First, compute predicted y estimates
         y_pred = pd.DataFrame(output_test, index=pat_ids, columns=outc_dims)
@@ -137,8 +145,8 @@ class XGBFeat:
         y_true = pd.DataFrame(y_test, index=pat_ids, columns=outc_dims)
 
         # Second, get configuration
-        model_config_all = {feat_id: self.models_per_feat[feat_id].get_params(deep=False) for feat_id in
-                            range(self.D_f)}
+        model_config_all = {feat_id: self.models_per_feat[feat].get_params(deep=False) for feat_id, feat in
+                            zip(range(self.D_f), self.feats)}
 
         # ----------------------------- Save Output Data --------------------------------
         # Useful objects

@@ -151,30 +151,6 @@ FEATURE_SCORING_DIC = {
 }
 
 
-def compute_binary(one_hot_labels: np.ndarray, target_label: int):
-    """
-    Compute a vector of binary labels indiciating the presence OR NOT of 
-    a SPECIFIC target class within the set of labels one_hot_labels.
-
-    Parameters
-    ----------
-    one_hot_labels : np.ndarray of shape N x O, where N is the number of 
-    samples and O is the number of outcome classes. 
-    
-    target_label : int. Must be within the range [0, ..., O - 1]
-
-    Returns
-    -------
-    binarised:: np.ndarray of shape (N, ) with binary entry indicating 
-    one_hot_labels matches target_label.
-    """
-    assert target_label in range(one_hot_labels.shape[-1])
-
-    binarised = (np.argmax(one_hot_labels, axis=-1) == target_label)
-
-    return binarised.astype(int)
-
-
 NEWS_INPUT_PARAMS = []
 
 
@@ -196,7 +172,7 @@ class NEWS:
 
         # Identify those that are not id columns
         self.feats = [feat for feat in feats if not _is_id_feat(feat)]
-        self.data_name = data_info["data_properties"]["data_name"]
+        self.data_name = data_info["data_load_config"]["data_name"]
 
         # Get proper model_config
         self.model_config = {key: value for key, value in kwargs.items() if key in NEWS_INPUT_PARAMS}
@@ -260,14 +236,14 @@ class NEWS:
                 if "mimic" in self.data_name.lower() and feat == "SPO2":
                     scoring_fn = score_SPO2_1  # MIMIC DOES NOT HAVE OXYGEN INFORMATION.
 
+                # Save function to run on numpy array
+                vec_scoring_fn = np.vectorize(scoring_fn)
+
                 # Apply score to data
-                output_scores += scoring_fn(X_test[:, feat_id])
+                output_scores += vec_scoring_fn(X_test[:, feat_id])
 
                 # add 1 to the number of features
                 num_feats_used += 1
-
-        # Take average
-        output_scores = output_scores / num_feats_used
 
         return output_scores
 
@@ -291,7 +267,6 @@ class NEWS:
         _, _, y_test = data_info["y"]
 
         # Get basic data information
-        data_properties = data_info["data_properties"]
         data_load_config = data_info["data_load_config"]
         data_name = data_load_config["data_name"]
 
@@ -326,8 +301,7 @@ class NEWS:
 
         # Return objects
         outputs_dic = {"save_fd": save_fd, "model_config": self.model_config,
-                       "news_scores": news_scores
-                       }
+                       "scores": news_scores, "y_true": y_test}
 
         # Print Data
         print(f"\n\n Experiments saved under {track_fd} and {save_fd}")
