@@ -744,8 +744,11 @@ class Model(CAMELOT):
         self.compile(optimizer=optimizer, run_eagerly=True)
 
         # Train model on initialisation procedure
+        train_data = tf.data.Dataset.from_tensor_slices((X_train, y_train)).shuffle(1000).batch(bs)
+        val_data = tf.data.Dataset.from_tensor_slices((X_val, y_val)).shuffle(1000).batch(bs)
+
         print("-" * 20, "\n", "Initialising Model", sep="\n")
-        self.initialise_model(data=(X_train, y_train), val_data=(X_val, y_val), epochs=epochs_init,
+        self.initialise_model(data=train_data, val_data=val_data, epochs=epochs_init,
                               learning_rate=lr, batch_size=bs, patience_epochs=patience_epochs)
 
         # Main Training phase
@@ -756,7 +759,7 @@ class Model(CAMELOT):
         self.run_num = run_num
 
         # Fit model
-        history = self.fit(x=X_train, y=y_train, validation_data=(X_val, y_val), batch_size=bs, epochs=epochs,
+        history = self.fit(train_data, validation_data=val_data, batch_size=bs, epochs=epochs,
                            verbose=2, callbacks=callbacks, **kwargs)
 
         return history

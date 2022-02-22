@@ -13,11 +13,12 @@ import src.models.model_utils as model_utils
 from src.results.main import evaluate
 import src.visualisation.main as vis_main
 
+import tensorflow as tf
 
-# physical_devices = tf.config.list_physical_devices('GPU')
-# tf.config.experimental.set_memory_growth(physical_devices[0], True)
+physical_devices = tf.config.list_physical_devices('GPU')
+tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 def main():
     # ---------------------------- Load Configurations --------------------------------------
