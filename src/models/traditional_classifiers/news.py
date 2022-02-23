@@ -276,13 +276,9 @@ class NEWS:
 
         # Define save_fd, track_fd
         save_fd = f"results/{data_name}/{self.model_name}/run{self.run_num}/"
-        track_fd = f"experiments/{data_name}/{self.model_name}/run{self.run_num}/"
 
         if not os.path.exists(save_fd):
             os.makedirs(save_fd)
-
-        if not os.path.exists(track_fd):
-            os.makedirs(track_fd)
 
         # Make prediction on test data
         output_test = self.predict(X_test[:, -1, :])  # Apply NewsI on last observation sign.
@@ -292,18 +288,14 @@ class NEWS:
         news_scores.to_csv(save_fd + "news_scores.csv", index=True)
 
         # save model parameters
-        save_params = {**data_info["data_load_config"], **self.model_config, **self.training_params}
-        with open(save_fd + "config.json", "w+") as f:
-            json.dump(save_params, f, indent=4)
-
-        with open(track_fd + "config.json", "w+") as f:
-            json.dump(save_params, f, indent=4)
+        with open(save_fd + "data_config.json", "w+") as f:
+            json.dump(data_load_config, f, indent=4)
 
         # Return objects
         outputs_dic = {"save_fd": save_fd, "model_config": self.model_config,
                        "scores": news_scores, "y_true": y_test}
 
         # Print Data
-        print(f"\n\n Experiments saved under {track_fd} and {save_fd}")
+        print(f"\n\n Results saved under {save_fd}")
 
         return outputs_dic

@@ -121,13 +121,9 @@ class SVMFeat:
 
         # Define save_fd, track_fd
         save_fd = f"results/{data_name}/{self.model_name}/run{self.run_num}/"
-        track_fd = f"experiments/{data_name}/{self.model_name}/run{self.run_num}/"
 
         if not os.path.exists(save_fd):
             os.makedirs(save_fd)
-
-        if not os.path.exists(track_fd):
-            os.makedirs(track_fd)
 
         # Make prediction on test data
         if self.model_config["probability"] is True:  # Probability is average of predicted probabilities
@@ -176,18 +172,12 @@ class SVMFeat:
         y_true.to_csv(save_fd + "y_true.csv", index=True, header=True)
 
         # save model parameters
-        save_params = {**data_info["data_load_config"], **self.model_config, **self.training_params}
-        with open(save_fd + "config.json", "w+") as f:
-            json.dump(save_params, f, indent=4)
-
-        with open(track_fd + "config.json", "w+") as f:
-            json.dump(save_params, f, indent=4)
+        with open(save_fd + "data_config.json", "w+") as f:
+            json.dump(data_info["data_load_config"], f, indent=4)
 
         with open(save_fd + "model_config.json", "w+") as f:
             json.dump(model_config_all, f, indent=4)
 
-        with open(track_fd + "model_config.json", "w+") as f:
-            json.dump(model_config_all, f, indent=4)
 
         # Return objects
         outputs_dic = {"save_fd": save_fd, "model_config": self.model_config,
@@ -195,6 +185,6 @@ class SVMFeat:
                        }
 
         # Print Data
-        print(f"\n\n Experiments saved under {track_fd} and {save_fd}")
+        print(f"\n\n Results saved under {save_fd}")
 
         return outputs_dic
