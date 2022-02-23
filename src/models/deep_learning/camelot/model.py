@@ -14,6 +14,7 @@ from tensorflow.keras import optimizers
 from sklearn.cluster import KMeans
 
 import os, json
+from typing import Union
 
 import src.models.deep_learning.camelot.model_utils as model_utils
 from src.models.deep_learning.model_blocks import MLP, AttentionRNNEncoder
@@ -223,7 +224,7 @@ class CAMELOT(tf.keras.Model):
         """
 
         # Unpack inputs
-        x, y = inputs[0], inputs[1]
+        x, y = inputs
 
         # Define variables for each network
         pred_vars = [var for var in self.trainable_variables if 'predictor' in var.name.lower()]
@@ -378,7 +379,7 @@ class CAMELOT(tf.keras.Model):
             - kwargs: dictionary arguments for KMeans initialisation.
 
         Updates model according to initialisation procedure. Initialisation consists of 3 steps:
-        - Outcome prediction by applying Predictor network directly on input data representation..
+        - Outcome prediction by applying Predictor network directly on input data representation.
         - Cluster representation initialisation through K-Means on input data representation.
         - Identifier initialisation by minimising loss on clusters as predicted by KMeans.
         """
@@ -401,7 +402,7 @@ class CAMELOT(tf.keras.Model):
 
         # Initialise Identifier
         iden_train_data = (x, clus_train_y)
-        iden_val_data = (val_x, clus_val_y)
+        iden_val_data = val_x, clus_val_y
         self._initialise_iden(data=iden_train_data, val_data=iden_val_data,
                               epochs=epochs, batch_size=batch_size, patience_epochs=patience_epochs)
 
@@ -425,11 +426,10 @@ class CAMELOT(tf.keras.Model):
         """
 
         # Unpack inputs
-        x, y = data
         x_val, y_val = val_data
 
-        # Convert to tf.Dataset for iteration
-        inputs = tf.data.Dataset.from_tensor_slices((x, y)).shuffle(buffer_size=5000).batch(batch_size)
+        # Load into data dataset
+        input_dataset = tf.data.Dataset.from_tensor_slices(data).shuffle(1000, seed=self.seed).batch(batch_size)
 
         # Initialise loss tracker
         self.enc_pred_loss_tracker = pd.DataFrame(data=np.nan, index=[], columns=["train_loss", "val_loss"])
@@ -440,7 +440,7 @@ class CAMELOT(tf.keras.Model):
         for epoch in range(epochs):
 
             epoch_loss = 0
-            for step_, (x_batch, y_batch) in enumerate(inputs):
+            for step_, (x_batch, y_batch) in enumerate(input_dataset):
                 # One Training Step
                 with tf.GradientTape(watch_accessed_variables=False) as tape:
                     tape.watch(enc_pred_vars)
@@ -499,7 +499,7 @@ class CAMELOT(tf.keras.Model):
         km.fit(z)
         print("KMeans fit has completed.")
 
-        # Centers are figureholders for representations and
+        # Centers are figure-holders for representations and
         centers = km.cluster_centers_
         cluster_pred = km.predict(z)
 
@@ -535,11 +535,10 @@ class CAMELOT(tf.keras.Model):
         class. This is matched against the true class.
         """
         # Input in the right format
-        X_train, clus_train_y = data
         X_val, clus_val_y = val_data
 
-        # Convert to tf.Dataset for iteration
-        inputs = tf.data.Dataset.from_tensor_slices((X_train, clus_train_y)).shuffle(buffer_size=5000).batch(batch_size)
+        # Convert to data Dataset
+        input_dataset = tf.data.Dataset.from_tensor_slices(data).shuffle(1000, seed=self.seed).batch(batch_size)
 
         # Initialise loss tracker
         self.iden_loss_tracker = pd.DataFrame(data=np.nan, index=[], columns=["train_loss", "val_loss"])
@@ -550,7 +549,7 @@ class CAMELOT(tf.keras.Model):
 
         for epoch in range(epochs):  # Iterate through epochs
             epoch_loss = 0
-            for step_, (x_batch, clus_batch) in enumerate(inputs):  # Iterate through batch
+            for step_, (x_batch, clus_batch) in enumerate(input_dataset):  # Iterate through batch
 
                 # One Training Step
                 with tf.GradientTape(watch_accessed_variables=False) as tape:
@@ -682,7 +681,7 @@ class Model(CAMELOT):
     Model Class Wrapper for CAMELOT with train and analyse methods.
     """
 
-    def __init__(self, data_info: dict, **kwargs):
+    def __init__(self, data_info: dict, model_config: dict, training_config: dict):
         """
         Initialise object with model configuration.
 
@@ -694,18 +693,59 @@ class Model(CAMELOT):
         output_dim = data_info["y"][-1].shape[-1]
 
         # Useful information
-        relevant_params = {key: value for key, value in kwargs.items() if key in CAMELOT_INPUT_PARAMS}
+        relevant_params = {key: value for key, value in model_config.items() if key in CAMELOT_INPUT_PARAMS}
         self.model_config = {"output_dim": output_dim, **relevant_params}
+        self.callback_lst = None
         self.run_num = 1
         self.model_name = "CAMELOT"
 
         # Initialise training parameters
-        self.training_params = None
+        self.training_params = training_config
 
         super().__init__(**self.model_config)
 
+        self.build_model(data_info)
+
+    def build_model(self, data_info):
+        """
+        Build all model parameters.
+
+        Params:
+        - data_info: dictionary with data information and parameters.
+
+        Returns:
+            if applicable, model built.
+        """
+
+        # Get data useful info
+        data_name = data_info["data_load_config"]["data_name"]
+        cbck_str, patience_epochs = self.training_params["cbck_str"], self.training_params["patience_epochs"]
+        lr = self.training_params["lr"]
+
+        # Unpack relevant data information
+        X_train, X_val, X_test = data_info["X"]
+        y_train, y_val, y_test = data_info["y"]
+
+        # Initialise model
+        self.build(X_train.shape)
+
+        # Load optimizer
+        optimizer = optimizers.Adam(learning_rate=lr)
+        self.compile(optimizer=optimizer, run_eagerly=True)
+
+        # Load Checkpoint
+        callbacks, run_num = model_utils.get_callbacks((X_val, y_val), data_name=data_name, track_loss="L_pred",
+                                                       other_cbcks=cbck_str, patience_epochs=patience_epochs,
+                                                       early_stop=True, lr_scheduler=True, tensorboard=True)
+
+        # Update run num
+        self.run_num = run_num
+        self.callback_lst = callbacks
+
+        return None
+
     def train(self, data_info, lr: float = 0.001, epochs_init: int = 100, epochs: int = 100, bs: int = 32,
-              patience_epochs: int = 200, cbck_str: str = "auc-sup-scores-cm", **kwargs):
+              patience_epochs: int = 200, gpu: Union[str, None] = None, **kwargs):
         """
         Fit method for training CAMELOT model.
 
@@ -715,37 +755,26 @@ class Model(CAMELOT):
         - "epochs_init": number of epochs to train initialisation (default = 100)
         - "epochs": number of epochs for main.py training (default = 100)
         - "bs": batch size (default = 32)
-        - "cbck_str": callback_string indicating callbacks to print during training (default: "auc-sup-scores-cm)
         - "patience_epochs": int, maximum number of epochs to wait for improvement. (default=200)
+        - gpu: str or None indicating how to use gpu training. If None, then no gpu is used. If "strategy", then
+        parallelise. Otherwise, regular GPU training.
         """
-        self.training_params = {
+        self.training_params.update({
             "lr": lr,
             "epochs_init": epochs_init,
             "epochs": epochs,
             "bs": bs,
             "patience_epochs": patience_epochs,
-            "cbck_str": cbck_str
-        }
-
-        # Get data useful info
-        data_name = data_info["data_load_config"]["data_name"]
+            "gpu": gpu
+        })
 
         # Unpack relevant data information
         X_train, X_val, X_test = data_info["X"]
         y_train, y_val, y_test = data_info["y"]
 
-        # TODO- ADD GPU USAGE
-
-        # Initialise model
-        self.build(X_train.shape)
-
-        # Load optimizer
-        optimizer = optimizers.Adam(learning_rate=lr)
-        self.compile(optimizer=optimizer, run_eagerly=True)
-
         # Train model on initialisation procedure
-        train_data = tf.data.Dataset.from_tensor_slices((X_train, y_train)).shuffle(1000).batch(bs)
-        val_data = tf.data.Dataset.from_tensor_slices((X_val, y_val)).shuffle(1000).batch(bs)
+        train_data = X_train, y_train
+        val_data = X_val, y_val
 
         print("-" * 20, "\n", "Initialising Model", sep="\n")
         self.initialise_model(data=train_data, val_data=val_data, epochs=epochs_init,
@@ -753,14 +782,17 @@ class Model(CAMELOT):
 
         # Main Training phase
         print("-" * 20, "\n", "STARTING MAIN TRAINING PHASE")
-        callbacks, run_num = model_utils.get_callbacks((X_val, y_val), data_name=data_name, track_loss="L_pred",
-                                                       other_cbcks=cbck_str, patience_epochs=patience_epochs,
-                                                       early_stop=True, lr_scheduler=True, tensorboard=True)
-        self.run_num = run_num
+        train_data = tf.data.Dataset.from_tensor_slices(train_data).shuffle(1000).batch(bs)
+        val_data = tf.data.Dataset.from_tensor_slices(val_data).shuffle(1000).batch(bs)
+
+        # Disable Autoshard
+        options = tf.data.Options()
+        options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.OFF
+        train_data, val_data = train_data.with_options(options), val_data.with_options(options)
 
         # Fit model
-        history = self.fit(train_data, validation_data=val_data, batch_size=bs, epochs=epochs,
-                           verbose=2, callbacks=callbacks, **kwargs)
+        history = self.fit(train_data, validation_data=val_data, epochs=epochs,
+                           verbose=2, callbacks=self.callback_lst)
 
         return history
 
@@ -806,7 +838,7 @@ class Model(CAMELOT):
         if not os.path.exists(track_fd):
             os.makedirs(track_fd)
 
-        # Other useful defs
+        # Other useful definitions
         K = self.K
         cluster_names = list(range(1, K + 1))
         output_test = self.predict(X_test)
@@ -862,10 +894,10 @@ class Model(CAMELOT):
         with open(track_fd + "config.json", "w+") as f:
             json.dump(save_params, f, indent=4)
 
-        with open(save_fd + "model_config_length.json", "w+") as f:
+        with open(save_fd + "model_config.json", "w+") as f:
             json.dump(all_model_config, f, indent=4)
 
-        with open(track_fd + "model_config_length.json", "w+") as f:
+        with open(track_fd + "model_config.json", "w+") as f:
             json.dump(all_model_config, f, indent=4)
 
         # Return objects
@@ -873,7 +905,8 @@ class Model(CAMELOT):
             "y_pred": y_pred, "class_pred": outc_pred, "y_true": y_true, "pis_pred": pis_pred, "clus_pred": clus_pred,
             "clus_representations": cluster_rep_set, "clus_phenotypes": clus_phenotypes,
             "init_loss_enc_pred": init_loss_1, "init_loss_iden": init_loss_2, "attention_unnorm": (alpha, beta, gamma),
-            "attention_norm": (alpha_norm, beta_norm, gamma_norm), "save_fd": save_fd, "model_config": self.model_config
+            "attention_norm": (alpha_norm, beta_norm, gamma_norm), "logs": track_fd + "logs",
+            "save_fd": save_fd, "model_config": self.model_config
         }
 
         # Print Data

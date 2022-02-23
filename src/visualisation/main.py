@@ -15,7 +15,7 @@ from sklearn.metrics.cluster import contingency_matrix as cont_matrix
 import src.visualisation.visualisation_utils as utils
 
 
-def visualise_cluster_groups(data_info: dict, save_fd: str, cluster_pred=None,  **kwargs):
+def visualise_cluster_groups(data_info: dict, save_fd: str, cluster_pred=None, **kwargs):
     """
     Visualise input data to model given input arrays X_og, y_og, and identifier columns.
 
@@ -217,8 +217,8 @@ def visualise_cluster_assignment(data_info, clus_pred=None, pis_pred=None, save_
             data_outc_phens = data_outc_phens.T
 
         print("Contingency Matrix outcomes x clusters: ", cm, sep="\n")
-        print("\nClus-normalised data-driven phenotyes: ", data_clus_phens, sep="\n")
-        print("\nOutc-normalised data-driven phenotyes: ", data_outc_phens, sep="\n")
+        print("\nClus-normalised data-driven phenotypes: ", data_clus_phens, sep="\n")
+        print("\nOutc-normalised data-driven phenotypes: ", data_outc_phens, sep="\n")
 
         if pis_pred is not None:
             fig, ax = utils.get_dists_per_clus(pis_pred)
@@ -261,7 +261,8 @@ def visualise_attention_maps(save_fd=None, data_info: dict = None, clus_pred=Non
                 alpha, beta, gamma = values
 
                 # Plot attention weights
-                (fig1, ax1), (fig2, ax2) = utils.plot_attention(alpha, beta, gamma=gamma, clus_pred=clus_pred, feats=feats)
+                (fig1, ax1), (fig2, ax2) = utils.plot_attention(alpha, beta, gamma=gamma, clus_pred=clus_pred,
+                                                                feats=feats)
 
                 # Add suptitles
                 fig1.suptitle("Cluster-wise attention with gamma.")
@@ -269,7 +270,7 @@ def visualise_attention_maps(save_fd=None, data_info: dict = None, clus_pred=Non
                 fig1.supylabel("Features")
 
                 # Same for Fig2
-                fig2.suptitle("Cluster-wise attention with subcohort.")
+                fig2.suptitle("Cluster-wise attention with sub-cohort.")
                 fig2.supxlabel("Time IDs")
                 fig2.supylabel("Features")
 
@@ -277,5 +278,23 @@ def visualise_attention_maps(save_fd=None, data_info: dict = None, clus_pred=Non
                 if save_fd is not None:
                     fig1.savefig(save_fd + "attention_v1.png", dpi=200)
                     fig2.savefig(save_fd + "attention_v2.png", dpi=200)
+
+    return None
+
+
+def load_tensorboard(data_info=None, logs: str = None, **kwargs):
+    """
+    Open browser with logs visualisation if logs exists.
+
+    Params:
+    - data_info: dict (or None) with input data information. Parameter kept for consistency. Defaults to None.
+    - logs: where tensorboard logs files are saved. If None, this functions does nothing.
+    - **kwargs: other meaningless parameters kept for consistency.
+
+    Returns:
+    - opens browser with tensorboard logs
+    """
+    if logs is not None:
+        os.system(f"tensorboard --logdir {logs}")
 
     return None

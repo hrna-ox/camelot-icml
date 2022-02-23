@@ -50,6 +50,9 @@ def evaluate(y_true=None, y_pred=None, clus_pred=None, data_info=None, save_fd=N
         cm = None
         clus_metrics = {}
 
+    elif "tskm" in save_fd.lower():
+        return None
+
     else:
 
         if isinstance(y_pred, pd.DataFrame):

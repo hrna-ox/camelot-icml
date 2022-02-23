@@ -187,8 +187,8 @@ def plot_loss_fn(train_values: List, val_values: List):
 
     # Initialise plot
     fig, ax = plt.subplots()
-    ax.plot(range(1, N + 1), train_values, color="b")
-    ax.plot(range(1, N + 1), val_values, color="tab:orange")
+    ax.plot(range(1, N + 1), train_values, color="b", label="train")
+    ax.plot(range(1, N + 1), val_values, color="tab:orange", label="val")
 
     # Add labels
     ax.set_xlabel("Epochs")

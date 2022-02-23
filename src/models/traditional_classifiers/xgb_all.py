@@ -142,10 +142,10 @@ class XGBAll:
         with open(track_fd + "config.json", "w+") as f:
             json.dump(save_params, f, indent=4)
 
-        with open(save_fd + "model_config_all.json", "w+") as f:
+        with open(save_fd + "model_config.json", "w+") as f:
             json.dump(self.model_config, f, indent=4)
 
-        with open(track_fd + "model_config_all.json", "w+") as f:
+        with open(track_fd + "model_config.json", "w+") as f:
             json.dump(self.model_config, f, indent=4)
 
         # Return objects

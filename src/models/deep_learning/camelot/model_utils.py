@@ -18,7 +18,7 @@ from sklearn.metrics import roc_auc_score as roc
 # ----------------------------------------------------------------------------------
 "Utility Functions and Global Params"
 
-LOGS_DIR = "experiments/"
+LOGS_DIR = "experiments/CAMELOT/"
 
 
 def tf_log(tensor):

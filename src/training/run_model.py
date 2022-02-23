@@ -5,7 +5,7 @@ Date Last updated: 24 Jan 2022
 Author: Henrique Aguiar
 Please contact via henrique.aguiar@eng.ox.ac.uk
 """
-import json, sys, os
+import json
 import matplotlib.pyplot as plt
 
 from src.data_processing.data_loader import data_loader
@@ -13,12 +13,6 @@ import src.models.model_utils as model_utils
 from src.results.main import evaluate
 import src.visualisation.main as vis_main
 
-import tensorflow as tf
-
-physical_devices = tf.config.list_physical_devices('GPU')
-tf.config.experimental.set_memory_growth(physical_devices[0], True)
-
-# os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 def main():
     # ---------------------------- Load Configurations --------------------------------------
@@ -46,7 +40,8 @@ def main():
 
     "Load model and fit"
     print("\n\n\n\n")
-    model = model_utils.get_model_from_str(data_info=data_info, **model_config)
+    model = model_utils.get_model_from_str(data_info=data_info, model_config=model_config,
+                                           training_config=training_config)
 
     # Train model
     history = model.train(data_info=data_info, **training_config)
@@ -75,12 +70,13 @@ def main():
     # "Attention maps where relevant"
     vis_main.visualise_attention_maps(**outputs_dic, data_info=data_info)
 
+    # Load tensorboard if exists
+    vis_main.load_tensorboard(**outputs_dic, data_info=data_info)
+
     # Show Figures
     plt.show(block=False)
 
     print("Analysis Complete.")
-    plt.show()
-    sys.exit()
 
 
 if __name__ == "__main__":

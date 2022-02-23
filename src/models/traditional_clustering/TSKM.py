@@ -17,7 +17,7 @@ class TSKM(TimeSeriesKMeans):
     Model Class Wrapper for a KMeans clustering model.
     """
 
-    def __init__(self, data_info: dict = {}, metric="euclidean", verbose=True, **kwargs):
+    def __init__(self, data_info: dict = {}, metric="euclidean", verbose=1, **kwargs):
         """
         Initialise object with model configuration.
 
@@ -91,8 +91,11 @@ class TSKM(TimeSeriesKMeans):
 
         # Unpack test data
         _, _, X_test = data_info["X"]
+        _, _, y_test = data_info["y"]
 
         # Get basic data information
+        data_properties = data_info["data_properties"]
+        outc_names = data_properties["outc_names"]
         data_load_config = data_info["data_load_config"]
         data_name = data_load_config["data_name"]
 
@@ -120,22 +123,48 @@ class TSKM(TimeSeriesKMeans):
         pis_pred = pd.DataFrame(pis_pred, index=pat_ids, columns=cluster_names)
         clus_pred = pd.Series(clus_pred, index=pat_ids)
 
+        # Define y_pred and y_true based on cluster proportion of outcomes
+        clus_data_phens = pd.DataFrame(np.empty, index=cluster_names, columns=outc_names)
+
+        for clus_id, clus in enumerate(cluster_names):
+            # Compute proportion of events in cluster
+            clus_outc_proportion = np.sum(y_test[clus_pred.values == clus_id, :], axis=0)
+
+            # Update
+            clus_data_phens.loc[clus, :] = clus_outc_proportion
+
+        # Compute y_pred and class_pred
+        y_pred = clus_data_phens.iloc[clus_pred.values, :].values
+        outc_pred = np.argmax(y_pred, axis=-1)
+
+        # Convert to DataFrame
+        y_pred = pd.DataFrame(y_pred, index=pat_ids, columns=outc_names)
+        outc_pred = pd.Series(outc_pred, index=pat_ids)
 
         # ----------------------------- Save Output Data --------------------------------
         # Useful objects
         pis_pred.to_csv(save_fd + "pis_pred.csv", index=True, header=True)
         clus_pred.to_csv(save_fd + "clus_pred.csv", index=True, header=True)
+        y_pred.to_csv(save_fd + "y_pred.csv", index=True, header=True)
+        outc_pred.to_csv(save_fd + "outc_pred.csv", index=True, header=True)
 
         # save model parameters
         save_params = {**data_info["data_load_config"], **self.model_config, **self.training_params}
         with open(save_fd + "config.json", "w+") as f:
             json.dump(save_params, f, indent=4)
 
-        with open(save_fd + "model_config_length.json", "w+") as f:
+        with open(save_fd + "model_config.json", "w+") as f:
+            json.dump(self.model_config, f, indent=4)
+
+        with open(track_fd + "config.json", "w+") as f:
+            json.dump(save_params, f, indent=4)
+
+        with open(track_fd + "model_config.json", "w+") as f:
             json.dump(self.model_config, f, indent=4)
 
         # Return objects
         outputs_dic = {
+            "y_pred": y_pred, "outc_pred": outc_pred,
             "pis_pred": pis_pred, "clus_pred": clus_pred, "save_fd": save_fd, "model_config": self.model_config
         }
 

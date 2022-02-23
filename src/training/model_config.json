@@ -1,5 +1,5 @@
 {
-   "model_name": "camelot",
+   "model_name": "tskm",
    "num_clusters": 10,
    "latent_dim": 16,
    "seed": 2323,
@@ -29,5 +29,6 @@
    "C": 0.1,
    "probability": true,
    "n_estimators": 200,
-   "objective": "softmax"
+   "objective": "softmax",
+   "n_clusters": 8
 }
