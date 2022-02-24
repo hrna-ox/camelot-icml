@@ -340,10 +340,10 @@ class UnsupervisedTargetMetrics(cbck.Callback):
         if epoch % self.interval == 0:
             # Compute predictions and latent representations
             latent_reps = self.model.Encoder(self.X_val)
-            model_output = (self.model(self.X_val)).numpy()
+            pis_pred = (self.model.Identifier(latent_reps)).numpy()
 
             # Convert to categorical
-            clus_pred = np.argmax(model_output, axis=-1)
+            clus_pred = np.argmax(pis_pred, axis=-1)
 
             # Reshape input data and allow feature comparison
             X_val_2d = np.reshape(self.X_val, (self.X_val.shape[0], -1))

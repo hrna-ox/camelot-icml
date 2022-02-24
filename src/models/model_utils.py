@@ -6,7 +6,9 @@ Created on Sun Nov 21 10:48:57 2021
 @author: henrique.aguiar@ds.ccrg.kadooriecentre.org
 """
 
+# Import Models
 from src.models.deep_learning.camelot.model import Model as CamelotModel
+from src.models.deep_learning.enc_pred.model import EncPred as EncPred
 from src.models.traditional_classifiers.svm_all import SVMAll
 from src.models.traditional_classifiers.svm_per_feat import SVMFeat
 from src.models.traditional_classifiers.xgb_all import XGBAll
@@ -18,6 +20,7 @@ import tensorflow as tf
 import os
 
 import absl.logging
+
 absl.logging.set_verbosity(absl.logging.ERROR)
 
 
@@ -39,7 +42,7 @@ def get_model_from_str(data_info: dict, model_config: dict, training_config: dic
     if "camelot" in model_name.lower():
 
         # Check if GPU is accessible
-        if gpu is None:
+        if gpu is None or gpu == 0:
 
             # Train only on CPU
             os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
@@ -60,10 +63,40 @@ def get_model_from_str(data_info: dict, model_config: dict, training_config: dic
                 strategy = tf.distribute.MirroredStrategy(devices=None)
 
                 with strategy.scope():
-                    model = CamelotModel(data_info=data_info, model_config=model_config, training_config=training_config)
+                    model = CamelotModel(data_info=data_info, model_config=model_config,
+                                         training_config=training_config)
 
             else:
                 model = CamelotModel(data_info=data_info, model_config=model_config, training_config=training_config)
+
+    elif "enc" in model_name.lower() and "pred" in model_name.lower():
+
+        # Check if GPU is accessible
+        if gpu is None or gpu == 0:
+
+            # Train only on CPU
+            os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+            model = EncPred(data_info=data_info, model_config=model_config, training_config=training_config)
+
+        # If GPU usage
+        else:
+
+            # Identify physical devices and limit memory growth
+            physical_devices = tf.config.list_physical_devices('GPU')[0]
+            print("\nPhysical Devices for Computation: ", physical_devices, sep="\n")
+            tf.config.experimental.set_memory_growth(physical_devices, True)
+
+            # If distributed strategy
+            if gpu == "strategy":
+
+                # Load strategy
+                strategy = tf.distribute.MirroredStrategy(devices=None)
+
+                with strategy.scope():
+                    model = EncPred(data_info=data_info, model_config=model_config, training_config=training_config)
+
+            else:
+                model = EncPred(data_info=data_info, model_config=model_config, training_config=training_config)
 
     elif "svm" in model_name.lower() and "all" in model_name.lower():
         model = SVMAll(data_info=data_info, **model_config)
