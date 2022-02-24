@@ -1,8 +1,11 @@
 # Remove folders
 **/data/**/*
+data/**/*
 models/**/*
 visualisations/**/*
-**/experiments/**/*
+experiments/**/*
+results/**/*
+src/training/*_config.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
