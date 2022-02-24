@@ -75,7 +75,7 @@ def get_model_from_str(data_info: dict, model_config: dict, training_config: dic
         if gpu is None or gpu == 0:
 
             # Train only on CPU
-            os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+            # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
             model = EncPred(data_info=data_info, model_config=model_config, training_config=training_config)
 
         # If GPU usage

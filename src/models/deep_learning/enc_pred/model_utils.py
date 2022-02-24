@@ -176,6 +176,7 @@ class SupervisedTargetMetrics(cbck.Callback):
 
     def on_epoch_end(self, epoch, *args, **kwargs):
         if epoch % self.interval == 0:
+
             # Compute y_pred, y_true in categorical format.
             model_output = (self.model(self.X_val)).numpy()
             class_pred = np.argmax(model_output, axis=-1)

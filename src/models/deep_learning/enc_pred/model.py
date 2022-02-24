@@ -120,7 +120,6 @@ class Model(tf.keras.Model):
         Returns: tuple of arrays:
             - y_pred: array-like of shape (bs, outcome_dim) with probability assignments.
         """
-
         # Encode data
         z = self.Encoder(inputs)
 
@@ -326,10 +325,10 @@ class EncPred(Model):
         train_data = tf.data.Dataset.from_tensor_slices(train_data).shuffle(1000).batch(bs)
         val_data = tf.data.Dataset.from_tensor_slices(val_data).shuffle(1000).batch(bs)
 
-        # Disable Autoshard
-        options = tf.data.Options()
-        options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.OFF
-        train_data, val_data = train_data.with_options(options), val_data.with_options(options)
+        # # Disable Autoshard
+        # options = tf.data.Options()
+        # options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.OFF
+        # train_data, val_data = train_data.with_options(options), val_data.with_options(options)
 
         # Fit model
         history = self.fit(train_data, validation_data=val_data, epochs=epochs,

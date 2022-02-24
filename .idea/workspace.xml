@@ -3,14 +3,11 @@
   <component name="ChangeListManager">
     <list default="true" id="e4ecba8e-2901-44aa-817c-245a30485212" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/camelot/model_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/camelot/model_utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/models/deep_learning/enc_pred/model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/enc_pred/model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/enc_pred/model_blocks.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/src/models/deep_learning/enc_pred/model_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/enc_pred/model_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/enc_pred/run_model.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/src/models/model_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/model_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/training/model_config.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/training/model_config.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/training/training_config.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/training/training_config.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/visualisation/visualisation_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/visualisation/visualisation_utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -99,7 +96,7 @@
       <workItem from="1644572177816" duration="4911000" />
       <workItem from="1644929700541" duration="10238000" />
       <workItem from="1645093877819" duration="4600000" />
-      <workItem from="1645701537833" duration="7622000" />
+      <workItem from="1645701537833" duration="9455000" />
     </task>
     <servers />
   </component>
@@ -193,7 +190,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/src/models/deep_learning/enc_pred/model.py</url>
-          <line>202</line>
+          <line>201</line>
           <option name="timeStamp" value="24" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">

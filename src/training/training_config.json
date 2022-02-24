@@ -3,7 +3,7 @@
    "epochs_init": 10,
    "epochs": 100,
    "bs": 16,
-   "cbck_str": "auc-cm",
+   "cbck_str": "auc",
    "patience_epochs": 500,
-   "gpu": "strategy"
+   "gpu": 0
 }

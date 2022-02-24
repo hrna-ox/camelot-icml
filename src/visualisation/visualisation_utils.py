@@ -16,13 +16,15 @@ from src.data_processing.data_loading_utils import _is_temporal_feat, _is_id_fea
 # ------------------ Useful objects ----------------------
 colors = get_cmap("tab10").colors
 
-with open("data/HAVEN/processed/units_dic.json", "r") as f:
-    UNITS_DIC = json.load(f)
-    f.close()
+# with open("data/HAVEN/processed/units_dic.json", "r") as f:
+#     UNITS_DIC = json.load(f)
+#     f.close()
+#
+# with open("data/MIMIC/processed/units_dic.json", "r") as f:
+#     UNITS_DIC = {**UNITS_DIC, **json.load(f)}
+#     f.close()
 
-with open("data/MIMIC/processed/units_dic.json", "r") as f:
-    UNITS_DIC = {**UNITS_DIC, **json.load(f)}
-    f.close()
+UNITS_DIC = {}
 
 
 def plot_attention(alpha, beta, gamma, clus_pred=None, feats=None):
