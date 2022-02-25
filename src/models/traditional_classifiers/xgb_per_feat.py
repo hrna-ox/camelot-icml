@@ -127,7 +127,6 @@ class XGBFeat:
         # Initialise output array for computing mean over variables
         output_test = np.zeros(shape=y_test.shape)
         for feat_id, feat in enumerate(self.feats):
-
             # Compute probability for feature
             output_feat = self.models_per_feat[feat].predict_proba(X_test[:, :, feat_id])
             output_test += output_feat
@@ -140,14 +139,20 @@ class XGBFeat:
         outc_pred = pd.Series(np.argmax(output_test, axis=-1), index=pat_ids)
         y_true = pd.DataFrame(y_test, index=pat_ids, columns=outc_dims)
 
+        # Define clusters as outcome predicted groups
+        pis_pred = y_pred
+        clus_pred = outc_pred
+
         # Second, get configuration
-        model_config_all = {feat_id: self.models_per_feat[feat].get_params(deep=False) for feat_id, feat in
-                            zip(range(self.D_f), self.feats)}
+        model_config = {feat_id: self.models_per_feat[feat].get_params(deep=False) for feat_id, feat in
+                        zip(range(self.D_f), self.feats)}
 
         # ----------------------------- Save Output Data --------------------------------
         # Useful objects
         y_pred.to_csv(save_fd + "y_pred.csv", index=True, header=True)
         outc_pred.to_csv(save_fd + "outc_pred.csv", index=True, header=True)
+        clus_pred.to_csv(save_fd + "clus_pred.csv", index=True, header=True)
+        pis_pred.to_csv(save_fd + "pis_pred.csv", index=True, header=True)
         y_true.to_csv(save_fd + "y_true.csv", index=True, header=True)
 
         # save model parameters
@@ -155,12 +160,12 @@ class XGBFeat:
             json.dump(data_info["data_load_config"], f, indent=4)
 
         with open(save_fd + "model_config.json", "w+") as f:
-            json.dump(model_config_all, f, indent=4)
-
+            json.dump(model_config, f, indent=4)
 
         # Return objects
         outputs_dic = {"save_fd": save_fd, "model_config": self.model_config,
-                       "y_pred": y_pred, "class_pred": outc_pred, "y_true": y_true
+                       "y_pred": y_pred, "class_pred": outc_pred, "clus_pred": clus_pred, "pis_pred": pis_pred,
+                       "y_true": y_true
                        }
 
         # Print Data

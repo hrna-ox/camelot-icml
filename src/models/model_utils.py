@@ -8,7 +8,8 @@ Created on Sun Nov 21 10:48:57 2021
 
 # Import Models
 from src.models.deep_learning.camelot.model import Model as CamelotModel
-from src.models.deep_learning.enc_pred.model import EncPred as EncPred
+from src.models.deep_learning.actpc.model import Model as ActpcModel
+from src.models.deep_learning.enc_pred.model import Model as EncPredModel
 from src.models.traditional_classifiers.svm_all import SVMAll
 from src.models.traditional_classifiers.svm_per_feat import SVMFeat
 from src.models.traditional_classifiers.xgb_all import XGBAll
@@ -69,14 +70,15 @@ def get_model_from_str(data_info: dict, model_config: dict, training_config: dic
             else:
                 model = CamelotModel(data_info=data_info, model_config=model_config, training_config=training_config)
 
-    elif "enc" in model_name.lower() and "pred" in model_name.lower():
+    # ACTPC
+    elif "actpc" in model_name.lower():
 
         # Check if GPU is accessible
         if gpu is None or gpu == 0:
 
             # Train only on CPU
-            # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-            model = EncPred(data_info=data_info, model_config=model_config, training_config=training_config)
+            os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+            model = ActpcModel(data_info=data_info, model_config=model_config, training_config=training_config)
 
         # If GPU usage
         else:
@@ -93,10 +95,42 @@ def get_model_from_str(data_info: dict, model_config: dict, training_config: dic
                 strategy = tf.distribute.MirroredStrategy(devices=None)
 
                 with strategy.scope():
-                    model = EncPred(data_info=data_info, model_config=model_config, training_config=training_config)
+                    model = ActpcModel(data_info=data_info, model_config=model_config,
+                                       training_config=training_config)
 
             else:
-                model = EncPred(data_info=data_info, model_config=model_config, training_config=training_config)
+                model = ActpcModel(data_info=data_info, model_config=model_config, training_config=training_config)
+
+    # Encoder Predictor Model
+    elif "enc" in model_name.lower() and "pred" in model_name.lower():
+
+        # Check if GPU is accessible
+        if gpu is None or gpu == 0:
+
+            # Train only on CPU
+            # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+            model = EncPredModel(data_info=data_info, model_config=model_config, training_config=training_config)
+
+        # If GPU usage
+        else:
+
+            # Identify physical devices and limit memory growth
+            physical_devices = tf.config.list_physical_devices('GPU')[0]
+            print("\nPhysical Devices for Computation: ", physical_devices, sep="\n")
+            tf.config.experimental.set_memory_growth(physical_devices, True)
+
+            # If distributed strategy
+            if gpu == "strategy":
+
+                # Load strategy
+                strategy = tf.distribute.MirroredStrategy(devices=None)
+
+                with strategy.scope():
+                    model = EncPredModel(data_info=data_info, model_config=model_config,
+                                         training_config=training_config)
+
+            else:
+                model = EncPredModel(data_info=data_info, model_config=model_config, training_config=training_config)
 
     elif "svm" in model_name.lower() and "all" in model_name.lower():
         model = SVMAll(data_info=data_info, **model_config)
@@ -114,7 +148,7 @@ def get_model_from_str(data_info: dict, model_config: dict, training_config: dic
         model = TSKM(data_info=data_info, **model_config)
 
     elif "news" in model_name.lower():
-        model = NEWS(**model_config)
+        model = NEWS(data_info=data_info, **model_config)
 
     else:
         raise ValueError(f"Correct Model name not specified. Value {model_name} given.")

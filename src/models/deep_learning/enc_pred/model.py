@@ -20,14 +20,13 @@ import src.models.deep_learning.enc_pred.model_utils as model_utils
 from src.models.deep_learning.model_blocks import MLP, LSTMEncoder
 
 
-class Model(tf.keras.Model):
+class EncPred(tf.keras.Model):
     """
     Model Class for Encoder-Predictor model architecture.
 
     Params:
 
         (General)
-    - num_clusters: number of clusters. (default = 10)
     - latent_dim: dimensionality of latent space. (default = 32)
     - output_dim: dimensionality of output space. (default = 4)
     - seed: Seed to run analysis on. (default = 4347)
@@ -222,7 +221,7 @@ ENCPRED_INPUT_PARAMS = ["latent_dim", "seed", "output_dim", "name", "regulariser
                         "predictor_params", "weighted_loss"]
 
 
-class EncPred(Model):
+class Model(EncPred):
     """
     Model Class Wrapper for ENCPRED model with train and analyse methods.
     """
@@ -326,9 +325,9 @@ class EncPred(Model):
         val_data = tf.data.Dataset.from_tensor_slices(val_data).shuffle(1000).batch(bs)
 
         # # Disable Autoshard
-        # options = tf.data.Options()
-        # options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.OFF
-        # train_data, val_data = train_data.with_options(options), val_data.with_options(options)
+        options = tf.data.Options()
+        options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.OFF
+        train_data, val_data = train_data.with_options(options), val_data.with_options(options)
 
         # Fit model
         history = self.fit(train_data, validation_data=val_data, epochs=epochs,

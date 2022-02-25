@@ -70,13 +70,12 @@ class ACTPC(tf.keras.Model):
 
         (Others)
     - optimizer_init: optimizer to use for initialisation training. (default = "adam")
-    - weighted_loss: whether to use weights on predictive clustering loss (default = "True")
     """
 
     def __init__(self, num_clusters=10, latent_dim=32, seed=4347, output_dim=4, name="CAMELOT",
                  alpha=0.01, beta=0.01, regulariser_params=(0.01, 0.01), dropout=0.6,
                  Actor_params=None, Selector_params=None, Critic_params=None, cluster_rep_lr=0.001,
-                 optimizer_init="adam", weighted_loss=True):
+                 optimizer_init="adam"):
 
         super().__init__(name=name)
 
@@ -121,14 +120,11 @@ class ACTPC(tf.keras.Model):
 
         # Others
         self._optimizer_init = tf.keras.optimizers.get(optimizer_init)
-        self.weighted_loss = weighted_loss
-        self.loss_weights = None
 
     # Build and Call Methods
     def build(self, input_shape):
         """Build method to serialise layers."""
         self.Actor.build(input_shape)
-        self.Actor.feat_time_attention_layer.build(input_shape)
 
         super().build(input_shape)
 
@@ -227,9 +223,9 @@ class ACTPC(tf.keras.Model):
         x, y = inputs
 
         # Define variables for each network
-        pred_vars = [var for var in self.trainable_variables if 'Critic' in var.name.lower()]
-        enc_id_vars = [var for var in self.trainable_variables if 'Actor' in var.name.lower() or
-                       'Selector' in var.name.lower()]
+        pred_vars = [var for var in self.trainable_variables if 'critic' in var.name.lower()]
+        enc_id_vars = [var for var in self.trainable_variables if 'actor' in var.name.lower() or
+                       'selector' in var.name.lower()]
         rep_vars = self.cluster_rep_set
 
         # # ------------------------------------------ OPTIMISE Critic ----------------------------------------
@@ -242,13 +238,11 @@ class ACTPC(tf.keras.Model):
         #     y_pred, pi = self.forward_pass(x)
         #     clus_phens = self.Critic(rep_vars)
         #
-        #     if self.weighted_loss is True:
-        #         self.loss_weights = model_utils.class_weighting(y)
         #
         #     # compute losses
-        #     l_crit = model_utils.l_crit(y, y_pred, weights=self.loss_weights)
-        #     l_actor = model_utils.l_crit(y, y_pred, weights=self.loss_weights) + self.alpha * model_utils.l_dist(pi)
-        #     l_clus = model_utils.l_crit(y, y_pred, weights=self.loss_weights) + self.beta * model_utils.l_clus(
+        #     l_crit = model_utils.l_crit(y, y_pred)
+        #     l_actor = model_utils.l_crit(y, y_pred) + self.alpha * model_utils.l_dist(pi)
+        #     l_clus = model_utils.l_crit(y, y_pred) + self.beta * model_utils.l_clus(
         #         clus_phens)
         #
         # # Compute gradients
@@ -269,13 +263,9 @@ class ACTPC(tf.keras.Model):
 
             # Make forward pass
             y_pred, pi = self.forward_pass(x)
-            clus_phens = self.Critic(rep_vars)
-
-            if self.weighted_loss is True:
-                self.loss_weights = model_utils.class_weighting(y)
 
             # compute losses
-            l_crit = model_utils.l_crit(y, y_pred, weights=self.loss_weights)
+            l_crit = model_utils.l_crit(y, y_pred)
 
         # Compute gradients
         pred_grad = tape.gradient(target=l_crit, sources=pred_vars)
@@ -292,11 +282,8 @@ class ACTPC(tf.keras.Model):
             # Make forward pass
             y_pred, pi = self.forward_pass(x)
 
-            if self.weighted_loss is True:
-                self.loss_weights = model_utils.class_weighting(y)
-
             # compute losses
-            l_actor = model_utils.l_crit(y, y_pred, weights=self.loss_weights) + self.alpha * model_utils.l_dist(pi)
+            l_actor = model_utils.l_crit(y, y_pred) + self.alpha * model_utils.l_prob(pi)
 
         # Compute gradients
         enc_id_grad = tape.gradient(target=l_actor, sources=enc_id_vars)
@@ -314,12 +301,9 @@ class ACTPC(tf.keras.Model):
             y_pred, pi = self.forward_pass(x)
             clus_phens = self.Critic(rep_vars)
 
-            if self.weighted_loss is True:
-                self.loss_weights = model_utils.class_weighting(y)
-
             # compute losses
-            l_clus = model_utils.l_crit(y, y_pred, weights=self.loss_weights) + self.beta * model_utils.l_clus(
-                rep_vars)
+            l_clus = model_utils.l_crit(y, y_pred) + self.beta * model_utils.l_phens(
+                clus_phens)
 
         # Compute gradients
         clus_grad = tape.gradient(target=l_clus, sources=rep_vars)
@@ -347,14 +331,10 @@ class ACTPC(tf.keras.Model):
         y_pred, pi = self.forward_pass(x)
         clus_phens = self.Critic(self.cluster_rep_set)
 
-        # Update loss weights depending on batch
-        if self.weighted_loss is True:
-            self.loss_weights = model_utils.class_weighting(y)
-
         # compute losses
-        l_crit = model_utils.l_crit(y, y_pred, weights=self.loss_weights)
-        l_actor = model_utils.l_crit(y, y_pred, weights=self.loss_weights) + self.alpha * model_utils.l_dist(pi)
-        l_clus = model_utils.l_crit(y, y_pred, weights=self.loss_weights) + self.beta * model_utils.l_clus(
+        l_crit = model_utils.l_crit(y, y_pred)
+        l_actor = model_utils.l_crit(y, y_pred) + self.alpha * model_utils.l_prob(pi)
+        l_clus = model_utils.l_crit(y, y_pred) + self.beta * model_utils.l_phens(
             clus_phens)
 
         return {"l_crit": l_crit, "L_clus_id": l_actor, "L_clus_sep": l_clus}
@@ -387,10 +367,6 @@ class ACTPC(tf.keras.Model):
         # Unpack data
         x, y = data
         val_x, val_y = val_data
-
-        # Compute loss weights if necessary
-        if self.weighted_loss is True:
-            self.loss_weights = model_utils.class_weighting(y)
 
         # Initialise init learning rate
         self._optimizer_init.learning_rate = learning_rate
@@ -433,7 +409,7 @@ class ACTPC(tf.keras.Model):
 
         # Initialise loss tracker
         self.enc_pred_loss_tracker = pd.DataFrame(data=np.nan, index=[], columns=["train_loss", "val_loss"])
-        enc_pred_vars = [var for var in self.trainable_variables if "Actor" in var.name or "Critic" in var.name]
+        enc_pred_vars = [var for var in self.trainable_variables if "actor" in var.name or "critic" in var.name]
 
         # Iterate through epochs and batches
         print("-" * 20, "\n", "Initialising Actor-Critic training.")
@@ -447,7 +423,7 @@ class ACTPC(tf.keras.Model):
 
                     # Prediction and loss
                     y_pred = self.Critic(self.Actor(x_batch))
-                    loss_batch = model_utils.l_crit(y_batch, y_pred, weights=self.loss_weights)
+                    loss_batch = model_utils.l_crit(y_batch, y_pred)
 
                 # Update gradients
                 enc_pred_grad = tape.gradient(loss_batch, enc_pred_vars)
@@ -461,7 +437,7 @@ class ACTPC(tf.keras.Model):
 
             # Compute validation loss on validation data
             y_val_crit = self.Critic(self.Actor(x_val))
-            loss_val = model_utils.l_crit(y_val, y_val_crit, weights=self.loss_weights)
+            loss_val = model_utils.l_crit(y_val, y_val_crit)
 
             # Print result and update tracker
             print("End of epoch %d - \n Training loss: %.4f  Validation loss %.4f" % (
@@ -542,7 +518,7 @@ class ACTPC(tf.keras.Model):
 
         # Initialise loss tracker
         self.sel_loss_tracker = pd.DataFrame(data=np.nan, index=[], columns=["train_loss", "val_loss"])
-        sel_vars = [var for var in self.trainable_variables if "Selector" in var.name]
+        sel_vars = [var for var in self.trainable_variables if "selector" in var.name]
 
         # Forward Selector pass and train
         print("-" * 20, "\nInitialising Selector training.")
@@ -583,39 +559,7 @@ class ACTPC(tf.keras.Model):
 
             self.sel_loss_tracker.loc[epoch + 1, :] = [epoch_loss / step_, loss_val]
 
-    # Useful Methods to compute attributes and model properties.
-    def compute_unnorm_attention_weights(self, inputs):
-        """
-        Computes unnormalised attention weights alpha, beta, gamma.
-
-        Params:
-        - inputs: array-like of shape (N, T, D_f).
-
-        Return: tuple of unnormalised attention weights.
-            - alpha: array-like of shape (N, T, D_f)
-            - beta: array-like of shape (1, T, 1)
-            - gamma: array-like of shape (N, K, D_f)
-        """
-        scores = self.Actor.compute_unnorm_scores(inputs, cluster_reps=self.cluster_rep_set)
-
-        return scores
-
-    def compute_norm_attention_weights(self, inputs):
-        """
-        Computes normalised attention weights alpha, beta, gamma.
-
-        Params:
-        - inputs: array-like of shape (N, T, D_f).
-
-        Return: tuple of normalised attention weights.
-            - alpha: array-like of shape (N, T, D_f)
-            - beta: array-like of shape (1, T, 1)
-            - gamma: array-like of shape (N, K, D_f)
-        """
-        scores = self.Actor.compute_norm_scores(inputs, cluster_reps=self.cluster_rep_set)
-
-        return scores
-
+    # Useful Model methods
     def compute_cluster_phenotypes(self):
         """
         Compute Cluster Phenotypes given cluster representations.
@@ -660,8 +604,7 @@ class ACTPC(tf.keras.Model):
                        f"{self.name}-alpha": self.alpha,
                        f"{self.name}-beta": self.beta,
                        f"{self.name}-regulariser": self.regulariser,
-                       f"{self.name}-dropout": self.dropout,
-                       f"{self.name}-weighted_loss": self.weighted_loss})
+                       f"{self.name}-dropout": self.dropout})
 
         # Update configuration for each model
         config.update(self.Actor.get_config())
@@ -671,14 +614,14 @@ class ACTPC(tf.keras.Model):
         return config
 
 
-CAMELOT_INPUT_PARAMS = ["num_clusters", "latent_dim", "seed", "output_dim", "name", "alpha", "beta",
-                        "regulariser_params", "dropout", "Actor_params", "Selector_params",
-                        "Critic_params", "cluster_rep_lr", "optimizer_init", "weighted_loss"]
+ACTPC_INPUT_PARAMS = ["num_clusters", "latent_dim", "seed", "output_dim", "name", "alpha", "beta",
+                      "regulariser_params", "dropout", "Actor_params", "Selector_params",
+                      "Critic_params", "cluster_rep_lr", "optimizer_init"]
 
 
 class Model(ACTPC):
     """
-    Model Class Wrapper for CAMELOT with train and analyse methods.
+    Model Class Wrapper for ACTPC with train and analyse methods.
     """
 
     def __init__(self, data_info: dict, model_config: dict, training_config: dict):
@@ -693,11 +636,11 @@ class Model(ACTPC):
         output_dim = data_info["y"][-1].shape[-1]
 
         # Useful information
-        relevant_params = {key: value for key, value in model_config.items() if key in CAMELOT_INPUT_PARAMS}
+        relevant_params = {key: value for key, value in model_config.items() if key in ACTPC_INPUT_PARAMS}
         self.model_config = {"output_dim": output_dim, **relevant_params}
         self.callback_lst = None
         self.run_num = 1
-        self.model_name = "CAMELOT"
+        self.model_name = "ACTPC_INPUT_PARAMS"
 
         # Initialise training parameters
         self.training_params = training_config
@@ -861,10 +804,6 @@ class Model(ACTPC):
         init_loss_2 = self.sel_loss_tracker
         init_loss_1.index.name, init_loss_2.index.name = "epoch", "epoch"
 
-        # Fifth, compute attention scores
-        alpha, beta, gamma = self.compute_unnorm_attention_weights(X_test)
-        alpha_norm, beta_norm, gamma_norm = self.compute_norm_attention_weights(X_test)
-
         # Sixth, get configuration
         all_model_config = self.get_config()
 
@@ -881,10 +820,6 @@ class Model(ACTPC):
         # save init losses
         init_loss_1.to_csv(track_fd + "enc_pred_init_loss.csv", index=True, header=True)
         init_loss_2.to_csv(track_fd + "sel_init_loss.csv", index=True, header=True)
-
-        # Save attention weights
-        np.savez(save_fd + "unnorm_weights", alpha=alpha, beta=beta, gamma=gamma)
-        np.savez(save_fd + "norm_weights", alpha=alpha_norm, beta=beta_norm, gamma=gamma_norm)
 
         # save model parameters
         save_params = {**data_info["data_load_config"], **self.model_config, **self.training_params}
@@ -904,8 +839,7 @@ class Model(ACTPC):
         outputs_dic = {
             "y_pred": y_pred, "class_pred": outc_pred, "y_true": y_true, "pis_pred": pis_pred, "clus_pred": clus_pred,
             "clus_representations": cluster_rep_set, "clus_phenotypes": clus_phenotypes,
-            "init_loss_enc_pred": init_loss_1, "init_loss_sel": init_loss_2, "attention_unnorm": (alpha, beta, gamma),
-            "attention_norm": (alpha_norm, beta_norm, gamma_norm), "logs": track_fd + "logs",
+            "init_loss_enc_pred": init_loss_1, "init_loss_sel": init_loss_2, "logs": track_fd + "logs",
             "save_fd": save_fd, "model_config": self.model_config
         }
 

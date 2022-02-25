@@ -131,10 +131,20 @@ class SVMAll(SVC):
         outc_pred = pd.Series(np.argmax(output_test, axis=-1), index=pat_ids)
         y_true = pd.DataFrame(y_test, index=pat_ids, columns=outc_dims)
 
+
+        # Define clusters as outcome predicted groups
+        pis_pred = y_pred
+        clus_pred = outc_pred
+
+        # Get model config
+        model_config = self.model_config
+
         # ----------------------------- Save Output Data --------------------------------
         # Useful objects
         y_pred.to_csv(save_fd + "y_pred.csv", index=True, header=True)
         outc_pred.to_csv(save_fd + "outc_pred.csv", index=True, header=True)
+        clus_pred.to_csv(save_fd + "clus_pred.csv", index=True, header=True)
+        pis_pred.to_csv(save_fd + "pis_pred.csv", index=True, header=True)
         y_true.to_csv(save_fd + "y_true.csv", index=True, header=True)
 
         # save model parameters
@@ -142,12 +152,12 @@ class SVMAll(SVC):
             json.dump(data_info["data_load_config"], f, indent=4)
 
         with open(save_fd + "model_config.json", "w+") as f:
-            json.dump(self.model_config, f, indent=4)
-
+            json.dump(model_config, f, indent=4)
 
         # Return objects
         outputs_dic = {"save_fd": save_fd, "model_config": self.model_config,
-                       "y_pred": y_pred, "class_pred": outc_pred, "y_true": y_true
+                       "y_pred": y_pred, "class_pred": outc_pred, "clus_pred": clus_pred, "pis_pred": pis_pred,
+                       "y_true": y_true
                        }
 
         # Print Data

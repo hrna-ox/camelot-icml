@@ -81,7 +81,11 @@ def evaluate(y_true=None, y_pred=None, clus_pred=None, data_info=None, save_fd=N
             x_test_3d = data_info["X"][-1] * (max_ - min_) + min_
 
             # Compute metrics
-            clus_metrics = utils.compute_cluster_performance(x_test_3d, clus_pred=clus_pred, y_true=y_true)
+            try:
+                clus_metrics = utils.compute_cluster_performance(x_test_3d, clus_pred=clus_pred, y_true=y_true)
+            except ValueError:
+                print("Too little predicted labels. Can't compute clustering metrics.")
+                clus_metrics = {}
 
         # Save Confusion matrix
         cm.to_csv(save_fd + "confusion_matrix.csv", index=True, header=True)
