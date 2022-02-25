@@ -1,9 +1,9 @@
 {
-   "model_name": "actpc",
+   "model_name": "xgball",
    "num_clusters": 10,
    "latent_dim": 16,
    "seed": 2323,
-   "name": "ACTPC",
+   "name": "XGBALL",
    "alpha": 0.1,
    "beta": 1,
    "regulariser_params": [
