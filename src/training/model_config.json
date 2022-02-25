@@ -1,0 +1,34 @@
+{
+   "model_name": "actpc",
+   "num_clusters": 10,
+   "latent_dim": 16,
+   "seed": 2323,
+   "name": "ACTPC",
+   "alpha": 0.1,
+   "beta": 1,
+   "regulariser_params": [
+      0.1,
+      0.1
+   ],
+   "dropout": 0.9,
+   "encoder_params": {
+      "hidden_layers": 0,
+      "hidden_nodes": 20
+   },
+   "identifier_params": {
+      "hidden_layers": 0,
+      "hidden_nodes": 30
+   },
+   "predictor_params": {
+      "hidden_layers": 0,
+      "hidden_nodes": 30
+   },
+   "cluster_rep_lr": 0.001,
+   "optimizer_init": "adam",
+   "weighted_loss": true,
+   "C": 0.1,
+   "probability": true,
+   "n_estimators": 200,
+   "objective": "softmax",
+   "n_clusters": 8
+}
