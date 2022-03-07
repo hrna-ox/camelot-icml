@@ -106,8 +106,9 @@ def main():
 	"""
 	# Subset to patients with enough data
 	vital_feats = list(VITALS_NAMING_DIC.values())
-	vitals_S3 = utils.remove_adms_high_missingness(vitals_S2, vital_feats, "stay_id",
-		                                     min_count=admission_min_count, min_frac=vitals_na_threshold)
+	# vitals_S3 = utils.remove_adms_high_missingness(vitals_S2, vital_feats, "stay_id",
+	# 	                                     min_count=admission_min_count, min_frac=vitals_na_threshold)
+	vitals_S3 = vitals_S2
 	vitals_S3.to_csv(SAVE_FD + "vitals_S3.csv", index=True, header=True)
 
 	"""
@@ -123,13 +124,14 @@ def main():
 	Apply Step 3 again with the blocked data.
 	"""
 	# Ensure blocks satisfy conditions - min counts, proportion of missingness AND time to final outcome
-	vitals_S5 = utils.remove_adms_high_missingness(vitals_S4, vital_feats, "stay_id",
-		                                     min_count=admission_min_count, min_frac=vitals_na_threshold)
+	# vitals_S5 = utils.remove_adms_high_missingness(vitals_S4, vital_feats, "stay_id",
+	# 	                                     min_count=admission_min_count, min_frac=vitals_na_threshold)
+	vitals_S5 = vitals_S4
 
 
 	"""
 	Consider those admissions with observations with at most an observations 1.5 hours before outtime 
 	"""
-	vitals_S5 = vitals_S5[vitals_S5["time_to_end_min"].dt.total_seconds() <= admission_min_time_to_outtime * 3600]
+	# vitals_S5 = vitals_S5[vitals_S5["time_to_end_min"].dt.total_seconds() <= admission_min_time_to_outtime * 3600]
 	vitals_S5.to_csv(SAVE_FD + "vitals_intermediate.csv", index=True, header=True)
 
