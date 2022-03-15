@@ -1,9 +1,9 @@
 {
-   "lr": 0.01,
+   "lr": 0.0001,
    "epochs_init": 10,
-   "epochs": 100,
-   "bs": 16,
-   "cbck_str": "auc",
+   "epochs": 10,
+   "bs": 128,
+   "cbck_str": "auc-cm",
    "patience_epochs": 500,
    "gpu": 0
 }

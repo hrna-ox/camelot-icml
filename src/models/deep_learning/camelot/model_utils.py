@@ -14,6 +14,7 @@ import tensorflow.keras.callbacks as cbck
 from sklearn.metrics import adjusted_rand_score, davies_bouldin_score, calinski_harabasz_score
 from sklearn.metrics import normalized_mutual_info_score, silhouette_score
 from sklearn.metrics import roc_auc_score as roc
+from sklearn.metrics import average_precision_score as aps
 
 # ----------------------------------------------------------------------------------
 "Utility Functions and Global Params"
@@ -56,7 +57,7 @@ def class_weighting(y_true):
 """Loss Functions"""
 
 
-def l_pred(y_true, y_pred, weights=None, name='pred_clus_loss'):
+def l_crit(y_true, y_pred, weights=None, name='pred_clus_loss'):
     """
     Negative weighted predictive clustering loss. Computes Cross-entropy between categorical y_true and y_pred.
     This is minimised when y_pred matches y_true.
@@ -104,13 +105,9 @@ def l_clus(cluster_reps, name='embedding_sep_loss'):
 
     # Compute pairwise Euclidean distance between cluster vectors, and sum over pairs of clusters.
     pairwise_loss = tf.reduce_sum((embedding_column - embedding_row) ** 2, axis=-1)
-    loss = - tf.reduce_sum(pairwise_loss, axis=None, name=name) - 1e-8
+    loss = - tf.reduce_mean(pairwise_loss, axis=None, name=name)
 
-    # normalise by factor
-    K = cluster_reps.get_shape()[0]
-    norm_loss = loss / (K * (K - 1))
-
-    return norm_loss
+    return loss
 
 
 def l_dist(clusters_prob, name="loss_clus_dist"):
@@ -253,7 +250,13 @@ class AUROC(cbck.Callback):
             roc_auc_score = roc(y_true=self.y_val, y_score=y_pred,
                                 average=None, multi_class='ovr')
 
+            # Compute PRC
+            prc_score = np.zeros(self.y_val.shape[-1])
+            for outc_id in range(self.y_val.shape[-1]):
+                prc_score[outc_id] = aps(self.y_val[:, outc_id], y_pred[:, outc_id])
+
             print("End of Epoch {:d} - OVR ROC score: {}".format(epoch, roc_auc_score))
+            print("End of Epoch {:d} - OVR PRC score: {}".format(epoch, prc_score))
 
 
 class PrintClusterInfo(cbck.Callback):

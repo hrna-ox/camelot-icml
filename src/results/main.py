@@ -63,7 +63,7 @@ def evaluate(y_true=None, y_pred=None, clus_pred=None, data_info=None, save_fd=N
         outc_names = data_properties["outc_names"]
 
         # Compute scores and confusion matrix
-        scores, cm = utils.compute_supervised_scores(y_true, y_pred, avg=avg)
+        scores, cm, Roc_curves = utils.compute_supervised_scores(y_true, y_pred, avg=avg)
 
         # Convert Confusion Matrix to pdDataFrame
         cm = pd.DataFrame(cm, index=pd.Index(data=outc_names, name="True Class"),
@@ -94,6 +94,13 @@ def evaluate(y_true=None, y_pred=None, clus_pred=None, data_info=None, save_fd=N
     scores = {**scores, **clus_metrics}
 
     # Save
+    for outc_id, outc in enumerate(outc_names):
+
+        # Get fig, ax and save
+        fig_id, ax_id = Roc_curves[outc_id]
+        fig_id.savefig(save_fd + f"ROC-PRC-{outc}")
+
+
     with open(save_fd + "scores.csv", "w+", newline="\n") as f:
         csv_writer = writer(f, delimiter=",")
 

@@ -8,12 +8,14 @@ Created on Sun Nov 21 10:48:57 2021
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from typing import Union, List
 
 from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
 from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score, confusion_matrix
-from sklearn.metrics import roc_auc_score, f1_score, recall_score, precision_score
+from sklearn.metrics import roc_auc_score, f1_score, recall_score, precision_score, average_precision_score
+from sklearn.metrics import RocCurveDisplay, PrecisionRecallDisplay
 from sklearn.metrics.cluster import contingency_matrix
 
 # List of ADMISSIBLE RESULTS SAVED KEYS
@@ -151,6 +153,37 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
     # Compute ROC-AUC first given y_pred and y_true format
     auc = roc_auc_score(y_true, y_pred, average=avg, multi_class="ovr")
 
+    # Get PRC
+    prc = np.zeros(shape=y_pred.shape[-1])
+    for outc_id in range(y_pred.shape[-1]):
+
+        # Update prc scores
+        prc[outc_id] = average_precision_score(y_true=y_true[:, outc_id], y_score=y_pred[:, outc_id], average=avg)
+
+    # GET ROC AND PRC CURVES
+    roc_prc_curves = {}
+    for outc_id in range(y_pred.shape[-1]):
+
+        # Add curve to map
+        fig, ax = plt.subplots(nrows=1, ncols=2)
+
+        RocCurveDisplay.from_predictions(y_true[:, outc_id], y_pred[:, outc_id], ax=ax[0])
+        PrecisionRecallDisplay.from_predictions(y_true[:, outc_id], y_pred[:, outc_id], ax=ax[1])
+
+        # Add info
+        ax[0].set_xlabel("FPR")
+        ax[0].set_ylabel("TPR")
+        ax[0].set_title(f"ROC Curve for outcome {outc_id}")
+
+        # Same for second ax
+        ax[1].set_xlabel("FPR")
+        ax[1].set_ylabel("TPR")
+        ax[1].set_title(f"PRC Curve for outcome {outc_id}")
+
+        # Add to curves
+        roc_prc_curves[outc_id] = fig, ax
+
+
     # Convert input arrays to categorical labels
     labels_true, labels_pred = np.argmax(y_true, axis=1), np.argmax(y_pred, axis=1)
 
@@ -175,6 +208,7 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
     # Return Dictionary
     scores_dic = {
         "ROC-AUC": auc,
+        "ROC-PRC": prc,
         "F1": f1,
         "Recall": rec,
         "Precision": prec,
@@ -182,12 +216,13 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
         "NMI": nmi
     }
 
-    return scores_dic, cm
+    return scores_dic, cm, RocCurveDisplay
 
 
 def compute_from_eas_scores(y_true: np.ndarray, scores: np.ndarray, outc_names: np.ndarray = None, **kwargs) -> dict:
     """
     Compute supervised performance metrics given input array scores.
+
 
     Params:
     - y_true: array-like of shape (N, num_outcs).

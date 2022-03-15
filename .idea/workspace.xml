@@ -2,16 +2,15 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="e4ecba8e-2901-44aa-817c-245a30485212" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/src/models/deep_learning/actpc/model.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/models/deep_learning/actpc/model_utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/AC-TPC/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/actpc/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/AC-TPC/class_AC_TPC.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/AC-TPC/main.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/AC-TPC/run-actpc.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/AC-TPC/utils.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/AC-TPC/utils_log.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/AC-TPC/utils_network.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/actpc/model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/actpc/model.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/camelot/model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/camelot/model.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/camelot/model_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/camelot/model_utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/results/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/results/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/results/results_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/results/results_utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/training/data_config.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/training/data_config.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/training/model_config.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/training/model_config.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/training/training_config.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/training/training_config.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -130,17 +129,17 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/src/models/deep_learning/camelot/model.py</url>
-          <line>398</line>
+          <line>419</line>
           <option name="timeStamp" value="5" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/src/models/deep_learning/camelot/model.py</url>
-          <line>441</line>
+          <line>463</line>
           <option name="timeStamp" value="6" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/src/models/deep_learning/camelot/model.py</url>
-          <line>524</line>
+          <line>553</line>
           <option name="timeStamp" value="7" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
@@ -184,11 +183,6 @@
           <option name="timeStamp" value="18" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/src/models/deep_learning/camelot/model.py</url>
-          <line>571</line>
-          <option name="timeStamp" value="21" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/src/visualisation/main.py</url>
           <line>177</line>
           <option name="timeStamp" value="22" />
@@ -202,6 +196,16 @@
           <url>file://$PROJECT_DIR$/src/models/deep_learning/enc_pred/model.py</url>
           <line>112</line>
           <option name="timeStamp" value="25" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/src/models/deep_learning/actpc/model.py</url>
+          <line>191</line>
+          <option name="timeStamp" value="26" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/src/models/deep_learning/camelot/model.py</url>
+          <line>430</line>
+          <option name="timeStamp" value="27" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
