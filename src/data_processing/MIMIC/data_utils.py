@@ -279,7 +279,7 @@ def select_death_icu_acute(df, admissions_df, timedt):
 
     # Identify Last observed vitals for corresponding admission
     hadm_information = admissions_df.query("hadm_id==@df.name").iloc[0, :]
-    window_start_point = hadm_information.loc["intime"]
+    window_start_point = hadm_information.loc["outtime"]
 
     # First check if death exists
     hadm_information = admissions_df.query("hadm_id==@df.name")
@@ -295,7 +295,7 @@ def select_death_icu_acute(df, admissions_df, timedt):
 
         # Check death within time window
         if time_from_start_point < timedt:
-            return pd.Series(data=[1, 0, 0, time_of_death], index=["De+I", "W", "Di", "time"])
+            return pd.Series(data=[1, 0, 0, 0, time_of_death], index=["De", "I", "W", "Di", "time"])
 
     # Otherwise, consider other transfers
     transfers_within_window = df[df["intime"].between(window_start_point, window_start_point + timedt)]
@@ -307,16 +307,16 @@ def select_death_icu_acute(df, admissions_df, timedt):
 
     if has_icus.sum() > 0:
         icu_transfers = transfers_within_window[has_icus]
-        return pd.Series(data=[1, 0, 0, icu_transfers.intime.min()],
-                         index=["De+I", "W", "Di", "time"])
+        return pd.Series(data=[0, 1, 0, 0, icu_transfers.intime.min()],
+                         index=["De", "I", "W", "Di", "time"])
 
     # Check to see if discharge has taken
     discharges = transfers_within_window.eventtype.str.contains("discharge", na=False)
     if discharges.sum() > 0:
-        return pd.Series(data=[0, 0, 1, transfers_within_window[discharges].intime.min()],
-                         index=["De+I", "W", "Di", "time"]
+        return pd.Series(data=[0, 0, 0, 1, transfers_within_window[discharges].intime.min()],
+                         index=["De", "I", "W", "Di", "time"]
                          )
     else:
-        return pd.Series(data=[0, 1, 0, transfers_within_window.intime.min()],
-                         index=["De+I", "W", "Di", "time"]
+        return pd.Series(data=[0, 0, 1, 0, transfers_within_window.intime.min()],
+                         index=["De", "I", "W", "Di", "time"]
                          )

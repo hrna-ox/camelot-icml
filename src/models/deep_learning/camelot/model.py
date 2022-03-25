@@ -13,7 +13,8 @@ import tensorflow as tf
 from tensorflow.keras import optimizers
 from sklearn.cluster import KMeans
 
-import os, json
+import os
+import json
 from typing import Union
 
 import src.models.deep_learning.camelot.model_utils as model_utils
@@ -64,19 +65,11 @@ class CAMELOT(tf.keras.Model):
         - hidden_nodes: int, For hidden feedforward layers, the dimensionality of the output space. (default = 30)
         - activation_fn: str/fn, The activation function to use. (default = 'sigmoid')
     Default value is {"name": "Predictor"}, which resets to default parameters.
-
-        (Cluster Representation Params)
-    - cluster_rep_lr: Learning rate for update of cluster_representations. (default = 0.01)
-
-        (Others)
-    - optimizer_init: optimizer to use for initialisation training. (default = "adam")
-    - weighted_loss: whether to use weights on predictive clustering loss (default = "True")
     """
 
     def __init__(self, num_clusters=10, latent_dim=32, seed=4347, output_dim=4, name="CAMELOT",
-                 alpha=0.01, beta=0.01, regulariser_params=(0.01, 0.01), dropout=0.6,
-                 encoder_params=None, identifier_params=None, predictor_params=None, cluster_rep_lr=0.001,
-                 optimizer_init="adam", weighted_loss=True):
+                 alpha_1=0.01, alpha_2=0.01, alpha_3=0.01, beta=0.01, regulariser_params=(0.01, 0.01), dropout=0.6,
+                 encoder_params=None, identifier_params=None, predictor_params=None):
 
         super().__init__(name=name)
 
@@ -87,7 +80,9 @@ class CAMELOT(tf.keras.Model):
         self.seed = seed
 
         # Loss function params
-        self.alpha = alpha
+        self.alpha_1 = alpha_1
+        self.alpha_2 = alpha_2
+        self.alpha_3 = alpha_3
         self.beta = beta
 
         # Common to all Networks
@@ -112,17 +107,11 @@ class CAMELOT(tf.keras.Model):
         # Cluster Representation params
         self.cluster_rep_set = tf.Variable(initial_value=tf.zeros(shape=[self.K, self.latent_dim], dtype='float32'),
                                            trainable=True, name='cluster_rep')
-        self.cluster_rep_lr = cluster_rep_lr
-        self.cluster_opt = optimizers.Adam(learning_rate=self.cluster_rep_lr)
+        # self.cluster_opt = optimizers.Adam(learning_rate=self.cluster_rep_lr)
 
         # Initialisation loss trackers
         self.enc_pred_loss_tracker = None
         self.iden_loss_tracker = None
-
-        # Others
-        self._optimizer_init = tf.keras.optimizers.get(optimizer_init)
-        self.weighted_loss = weighted_loss
-        self.loss_weights = None
 
     # Build and Call Methods
     def build(self, input_shape):
@@ -165,11 +154,8 @@ class CAMELOT(tf.keras.Model):
         pi = self.Identifier(z)
 
         # Sample from cluster assignments and assign corresponding cluster representations
-        cluster_samp = self._sample_from_probs(pi)
-        sample_representations = self._select_representations_from_sample(cluster_samp)
-
-        # Make predictions
-        y_pred = self.Predictor(sample_representations)
+        clus_phens = self.Predictor(self.cluster_rep_set)
+        y_pred = tf.linalg.matmul(pi, clus_phens)
 
         return y_pred, pi
 
@@ -243,110 +229,27 @@ class CAMELOT(tf.keras.Model):
             y_pred, pi = self.forward_pass(x)
             clus_phens = self.Predictor(rep_vars)
 
-            if self.weighted_loss is True:
-                self.loss_weights = model_utils.class_weighting(y)
+            # Compute Loss Weights
+            loss_weights = model_utils.class_weighting(y)
 
             # compute losses
-            l_crit = model_utils.l_crit(y, y_pred)
-            l_dist = model_utils.l_dist(pi)
-            # l_entr = model_utils.l_entr(pi)
+            l_crit = model_utils.l_crit(y, y_pred, weights=loss_weights)
+            l_dist = model_utils.l_dist(y_pred=y_pred, true_dist=loss_weights)
+            l_pat_entr = model_utils.l_pat_dist(clusters_prob=pi)
+            l_clus_entr = model_utils.l_clus_dist(clusters_prob=pi)
             l_clus = model_utils.l_clus(clus_phens)
 
             # Get loss
-            loss = l_crit + self.alpha * l_dist + self.beta * l_clus
+            loss = l_crit + self.alpha_1 * l_dist + self.alpha_2 * l_pat_entr + self.alpha_3 * l_clus_entr + \
+                   self.beta * l_clus
 
-        # Compute gradients
+        # Compute gradients and train model
         all_grad = tape.gradient(target=loss, sources=all_vars)
-
-        # Apply gradients
         self.optimizer.apply_gradients(zip(all_grad, all_vars))
 
-        #
-        # # ------------------------------------------ OPTIMISE PREDICTOR ----------------------------------------
-        #
-        # # Initialise GradientTape to compute gradients
-        # with tf.GradientTape(watch_accessed_variables=False, persistent=True) as tape:
-        #     tape.watch(pred_vars)
-        #
-        #     # Make forward pass
-        #     y_pred, pi = self.forward_pass(x)
-        #     clus_phens = self.Predictor(rep_vars)
-        #
-        #     if self.weighted_loss is True:
-        #         self.loss_weights = model_utils.class_weighting(y)
-        #
-        #     # compute losses
-        #     l_pred = model_utils.l_pred(y, y_pred, weights=self.loss_weights)
-        #
-        # # Compute gradients
-        # pred_grad = tape.gradient(target=l_pred, sources=pred_vars)
-        #
-        # # Apply gradients
-        # self.optimizer.apply_gradients(zip(pred_grad, pred_vars))
-        #
-        # # ------------------------------------------ OPTIMISE ENCODER - IDENTIFIER ------------------------------------
-        #
-        # # Initialise GradientTape to compute gradients
-        # with tf.GradientTape(watch_accessed_variables=False, persistent=True) as tape:
-        #     tape.watch(enc_id_vars)
-        #
-        #     # Make forward pass
-        #     y_pred, pi = self.forward_pass(x)
-        #
-        #     if self.weighted_loss is True:
-        #         self.loss_weights = model_utils.class_weighting(y)
-        #
-        #     # compute losses
-        #     l_enc_id = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.alpha * model_utils.l_dist(pi)
-        #
-        # # Compute gradients
-        # enc_id_grad = tape.gradient(target=l_enc_id, sources=enc_id_vars)
-        #
-        # # Apply gradients
-        # self.optimizer.apply_gradients(zip(enc_id_grad, enc_id_vars))
-        #
-        # # ------------------------------------------ OPTIMISE CLUSTERS ----------------------------------------
-        #
-        # # Initialise GradientTape to compute gradients
-        # with tf.GradientTape(watch_accessed_variables=False, persistent=True) as tape:
-        #     tape.watch([rep_vars])
-        #
-        #     # Make forward pass
-        #     y_pred, pi = self.forward_pass(x)
-        #     clus_phens = self.Predictor(rep_vars)
-        #
-        #     if self.weighted_loss is True:
-        #         self.loss_weights = model_utils.class_weighting(y)
-        #
-        #     # compute losses
-        #     l_clus = model_utils.l_pred(y, y_pred, weights=self.loss_weights) + self.beta * model_utils.l_clus(
-        #         rep_vars)
-        #
-        # # Compute gradients
-        # clus_grad = tape.gradient(target=l_clus, sources=rep_vars)
-        #
-        # # Apply gradients
-        # self.cluster_opt.apply_gradients(zip([clus_grad], [rep_vars]))
-
-        # Recompute after training
-
-        # Make forward pass
-        y_pred, pi = self.forward_pass(x)
-        clus_phens = self.Predictor(rep_vars)
-
-        if self.weighted_loss is True:
-            self.loss_weights = model_utils.class_weighting(y)
-
-        # compute losses
-        l_crit = model_utils.l_crit(y, y_pred)
-        l_dist = model_utils.l_dist(pi)
-        # l_entr = model_utils.l_entr(pi)
-        l_clus = model_utils.l_clus(clus_phens)
-
-        # Get loss
-        loss = l_crit + self.alpha * l_dist + self.beta * l_clus
-
-        return {"Loss": loss, "L_pred": l_crit, "L_clus_id": l_dist, "L_clus_sep": l_clus}
+        # Return losses
+        return {"Loss": loss, "L_pred": l_crit, "l_dist": l_dist, "l_pat_entr": l_pat_entr, "l_clus_entr": l_clus_entr,
+                "L_clus": l_clus}
 
     def test_step(self, inputs):
         """
@@ -365,24 +268,27 @@ class CAMELOT(tf.keras.Model):
         y_pred, pi = self.forward_pass(x)
         clus_phens = self.Predictor(self.cluster_rep_set)
 
-        # Update loss weights depending on batch
-        if self.weighted_loss is True:
-            self.loss_weights = model_utils.class_weighting(y)
+        # Compute Weights
+        loss_weights = model_utils.class_weighting(y)
 
         # compute losses
-        l_crit = model_utils.l_crit(y, y_pred)
-        l_dist = model_utils.l_dist(pi)
-        # l_entr = model_utils.l_entr(pi)
+        l_crit = model_utils.l_crit(y, y_pred, weights=loss_weights)
+        l_dist = model_utils.l_dist(y_pred=y_pred, true_dist=loss_weights)
+        l_pat_entr = model_utils.l_pat_dist(clusters_prob=pi)
+        l_clus_entr = model_utils.l_clus_dist(clusters_prob=pi)
         l_clus = model_utils.l_clus(clus_phens)
 
-        # Get main loss
-        loss = l_crit + self.alpha * l_dist + self.beta * l_clus
+        # Get loss
+        loss = l_crit + self.alpha_1 * l_dist + self.alpha_2 * l_pat_entr + self.alpha_3 * l_clus_entr + \
+               self.beta * l_clus
 
-        return {"Loss": loss, "L_pred": l_crit, "L_clus_id": l_dist, "L_clus_sep": l_clus}
+        # Return losses
+        return {"Loss": loss, "L_pred": l_crit, "l_dist": l_dist, "l_pat_entr": l_pat_entr, "l_clus_entr": l_clus_entr,
+                "L_clus": l_clus}
 
     # Initialisation Methods for Model Training
-    def initialise_model(self, data: tuple, val_data: tuple, epochs: int = 100, learning_rate: float = 0.001,
-                         batch_size: int = 64, patience_epochs: int = 200, **kwargs):
+    def initialise_model(self, data: tuple, val_data: tuple, epochs_1: int = 100, epochs_2: int = 100,
+                         batch_size: int = 64, patience_epochs: int = 200, training_rate: float = 0.001, **kwargs):
         """
         Initialisation Method for Model.
 
@@ -409,26 +315,19 @@ class CAMELOT(tf.keras.Model):
         x, y = data
         val_x, val_y = val_data
 
-        # Compute loss weights if necessary
-        if self.weighted_loss is True:
-            self.loss_weights = model_utils.class_weighting(y)
-
-        # Initialise init learning rate
-        self._optimizer_init.learning_rate = learning_rate
-
         # Go through initialisation steps
-        self._initialise_enc_pred(data=data, val_data=val_data, epochs=epochs, batch_size=batch_size,
-                                  patience_epochs=patience_epochs)
-        clus_train_y, clus_val_y = self._initialise_clus(x, val_x, **kwargs)
+        self._initialise_enc_pred(data=data, val_data=val_data, epochs=epochs_1, batch_size=batch_size,
+                                  patience_epochs=patience_epochs, training_rate=training_rate)
+
+        clus_train_y, clus_val_y = self._initialise_clus(x, val_x)
 
         # Initialise Identifier
         iden_train_data = (x, clus_train_y)
         iden_val_data = val_x, clus_val_y
         self._initialise_iden(data=iden_train_data, val_data=iden_val_data,
-                              epochs=epochs, batch_size=batch_size, patience_epochs=patience_epochs)
+                              epochs=epochs_2, batch_size=batch_size, patience_epochs=patience_epochs)
 
-    def _initialise_enc_pred(self, data, val_data, epochs=100, batch_size=64,
-                             patience_epochs=200):
+    def _initialise_enc_pred(self, data, val_data, epochs=100, batch_size=64, patience_epochs=200, training_rate=0.001):
         """
           Initialisation Method for Encoder and Predictor blocks.
 
@@ -441,13 +340,14 @@ class CAMELOT(tf.keras.Model):
                   - y: array-like of shape (N', num_outcs)
               - epochs: int, number of epochs for training. (default = 100)
               - batch_size: int, size of individual batches.
+              - training_rate: float, learning rate of initialise training (default=0.001)
 
         Input data passes through Encoder network to obtain data representations. Predictor then outputs a predicted
         class. This is matched against the true class.
         """
 
-        # Unpack inputs
-        x_val, y_val = val_data
+        # Get optimiser information
+        optimiser = optimizers.Adam(learning_rate=training_rate)
 
         # Load into data dataset
         input_dataset = tf.data.Dataset.from_tensor_slices(data).shuffle(1000, seed=self.seed).batch(batch_size)
@@ -461,7 +361,7 @@ class CAMELOT(tf.keras.Model):
         print("-" * 20, "\n", "Initialising encoder-predictor training.")
         for epoch in range(epochs):
 
-            epoch_loss = 0
+            epoch_loss, step_ = 0, 0
             for step_, (x_batch, y_batch) in enumerate(input_dataset):
                 # One Training Step
                 with tf.GradientTape(watch_accessed_variables=False) as tape:
@@ -469,11 +369,11 @@ class CAMELOT(tf.keras.Model):
 
                     # Prediction and loss
                     y_pred = self.Predictor(self.Encoder(x_batch))
-                    loss_batch = model_utils.l_crit(y_batch, y_pred, weights=self.loss_weights)
+                    loss_batch = model_utils.l_crit(y_batch, y_pred)
 
                 # Update gradients
                 enc_pred_grad = tape.gradient(loss_batch, enc_pred_vars)
-                self._optimizer_init.apply_gradients(zip(enc_pred_grad, enc_pred_vars))
+                optimiser.apply_gradients(zip(enc_pred_grad, enc_pred_vars))
 
                 # Update loss
                 epoch_loss += loss_batch
@@ -481,26 +381,29 @@ class CAMELOT(tf.keras.Model):
                 # Print current batch loss - clears line and re-writes
                 print("Batch Loss %.4f" % loss_batch, end="\r", flush=True)
 
-            # Compute validation loss on validation data
-            val_loss = 0
-            for val_step_, (x_val, y_val) in enumerate(val_dataset):
+            # Take mean over whole data
+            epoch_loss = epoch_loss / step_
 
+            # Compute validation loss on validation data
+            val_loss, val_step_ = 0, 0
+            for val_step_, (x_val, y_val) in enumerate(val_dataset):
                 # Get forward pass
                 y_val_pred = self.Predictor(self.Encoder(x_val))
-                loss_val_batch = model_utils.l_crit(y_val, y_val_pred, weights=self.loss_weights)
+                loss_val_batch = model_utils.l_crit(y_val, y_val_pred)
 
                 # Update loss
                 val_loss += loss_val_batch
 
+            # Take mean over whole dataset
+            val_loss = val_loss / val_step_
+
             # Print result and update tracker
-            print("End of epoch %d - \n Training loss: %.4f  Validation loss %.4f" % (
-                epoch, epoch_loss / step_, val_loss / val_step_))
+            self.enc_pred_loss_tracker.loc[epoch + 1, :] = [epoch_loss, val_loss]
+            print("End of epoch %d - \n Training loss: %.4f  Validation loss %.4f" % (epoch, epoch_loss, val_loss))
 
             # Check if result hasn't improved for 2 epochs
-            if epoch > patience_epochs and val_loss / val_step_ >= self.enc_pred_loss_tracker.iloc[-patience_epochs:-1, -1].min():
+            if epoch > patience_epochs and epochs > 20 and val_loss >= self.enc_pred_loss_tracker.iloc[-patience_epochs-20:-20, -1].min():
                 break
-
-            self.enc_pred_loss_tracker.loc[epoch + 1, :] = [epoch_loss / step_, val_loss / val_step_]
 
     def _initialise_clus(self, x, val_x, **kwargs):
         """
@@ -522,15 +425,19 @@ class CAMELOT(tf.keras.Model):
         # Compute Latent Projections
         print("-" * 20, "\n", "Initialising cluster representations.")
         z = self.Encoder(x).numpy()
+        y_pred = self.Predictor(self.Encoder(x)).numpy()
 
         # Fit KMeans
         km = KMeans(n_clusters=self.K, init="k-means++", random_state=self.seed, **kwargs)
-        km.fit(z)
+        km.fit(y_pred)
         print("KMeans fit has completed.")
 
-        # Centers are figure-holders for representations and
-        centers = km.cluster_centers_
-        cluster_pred = km.predict(z)
+        # Make predictions and get predicted centers
+        cluster_pred = km.predict(y_pred)
+        _one_hot_clus_assign = np.eye(self.K)[cluster_pred]
+
+        # Compute average of cluster assignments
+        centers = np.matmul(np.transpose(_one_hot_clus_assign), z) / np.sum(_one_hot_clus_assign, axis=0).reshape(-1, 1)
 
         # Compute Initialised Estimates
         print("\nInitialised Phenotypes: ", self.Predictor(centers))
@@ -541,12 +448,12 @@ class CAMELOT(tf.keras.Model):
         clus_train_y = np.eye(self.K)[cluster_pred]
 
         # Make predictions on validation data
-        z_val = self.Encoder(val_x).numpy()
-        clus_val_y = np.eye(self.K)[km.predict(z_val)]
+        y_val = self.Predictor(self.Encoder(val_x)).numpy()
+        clus_val_y = np.eye(self.K)[km.predict(y_val)]
 
         return clus_train_y.astype(np.float32), clus_val_y.astype(np.float32)
 
-    def _initialise_iden(self, data, val_data, epochs=100, batch_size=64, patience_epochs=200):
+    def _initialise_iden(self, data, val_data, epochs=100, batch_size=64, patience_epochs=200, training_rate=0.001):
         """
           Initialisation Method for Identifier Network
 
@@ -559,12 +466,14 @@ class CAMELOT(tf.keras.Model):
                   - clus_val_y: array-like of shape (N', K)
               - epochs: int, number of epochs for training. (default = 100)
               - batch_size: int, size of individual batches.
+              - training_rate: float, learning rate of initialise training (default=0.001)
 
         Input data passes through Encoder network to obtain data representations. Predictor then outputs a predicted
         class. This is matched against the true class.
         """
-        # Input in the right format
-        X_val, clus_val_y = val_data
+
+        # Get optimiser
+        optimiser = optimizers.Adam(learning_rate=training_rate)
 
         # Convert to data Dataset
         input_dataset = tf.data.Dataset.from_tensor_slices(data).shuffle(1000, seed=self.seed).batch(batch_size)
@@ -572,13 +481,13 @@ class CAMELOT(tf.keras.Model):
 
         # Initialise loss tracker
         self.iden_loss_tracker = pd.DataFrame(data=np.nan, index=[], columns=["train_loss", "val_loss"])
-        iden_vars = [var for var in self.trainable_variables if "Identifier" in var.name]
+        iden_vars = [var for var in self.trainable_variables if "identifier" in var.name.lower()]
 
         # Forward Identifier pass and train
         print("-" * 20, "\nInitialising Identifier training.")
 
         for epoch in range(epochs):  # Iterate through epochs
-            epoch_loss = 0
+            epoch_loss, step_ = 0, 0
             for step_, (x_batch, clus_batch) in enumerate(input_dataset):  # Iterate through batch
 
                 # One Training Step
@@ -591,7 +500,7 @@ class CAMELOT(tf.keras.Model):
 
                 # Update gradients
                 iden_grad = tape.gradient(loss_batch, iden_vars)
-                self._optimizer_init.apply_gradients(zip(iden_grad, iden_vars))
+                optimiser.apply_gradients(zip(iden_grad, iden_vars))
 
                 # Update loss
                 epoch_loss += loss_batch
@@ -599,27 +508,29 @@ class CAMELOT(tf.keras.Model):
                 # Print current batch loss - clears line and re-writes
                 print("Batch Loss %.4f" % loss_batch, end="\r", flush=True)
 
-            # Compute validation loss on validation data
-            val_loss = 0
-            for val_step_, (x_val, y_val) in enumerate(val_dataset):
+            # Get average over data
+            epoch_loss = epoch_loss / step_
 
+            # Compute validation loss on validation data
+            val_loss, val_step_ = 0, 0
+            for val_step_, (x_val, clus_val) in enumerate(val_dataset):
                 # Get forward pass
-                clus_pred = self.Identifier(self.Encoder(x_batch))
-                loss_val_batch = model_utils.l_crit(clus_batch, clus_pred)
+                clus_pred = self.Identifier(self.Encoder(x_val))
+                loss_val_batch = model_utils.l_crit(clus_val, clus_pred)
 
                 # Update loss
                 val_loss += loss_val_batch
 
-            # Print result and update tracker
-            print("End of epoch %d - \n Training loss: %.4f  Validation loss %.4f" % (
-                epoch, epoch_loss / step_, val_loss / val_step_))
+            # Get average over data
+            val_loss = val_loss / val_step_
 
+            # Print result and update tracker
+            print("End of epoch %d - \n Training loss: %.4f  Validation loss %.4f" % (epoch, epoch_loss, val_loss))
+            self.iden_loss_tracker.loc[epoch + 1, :] = [epoch_loss, val_loss]
 
             # Check if result hasn't improved for 2 epochs
-            if epoch > patience_epochs and val_loss / val_step_ >= self.iden_loss_tracker.iloc[-patience_epochs:-1, -1].min():
+            if epoch > patience_epochs and epoch > 20 and val_loss >= self.iden_loss_tracker.iloc[-patience_epochs-20:-21, -1].min():
                 break
-
-            self.iden_loss_tracker.loc[epoch + 1, :] = [epoch_loss / step_, val_loss / val_step_]
 
     # Useful Methods to compute attributes and model properties.
     def compute_unnorm_attention_weights(self, inputs):
@@ -695,11 +606,12 @@ class CAMELOT(tf.keras.Model):
                        f"{self.name}-latent_dim": self.latent_dim,
                        f"{self.name}-output_dim": self.output_dim,
                        f"{self.name}-seed": self.seed,
-                       f"{self.name}-alpha": self.alpha,
+                       f"{self.name}-alpha_1": self.alpha_1,
+                       f"{self.name}-alpha_2": self.alpha_2,
+                       f"{self.name}-alpha_3": self.alpha_3,
                        f"{self.name}-beta": self.beta,
                        f"{self.name}-regulariser": self.regulariser,
-                       f"{self.name}-dropout": self.dropout,
-                       f"{self.name}-weighted_loss": self.weighted_loss})
+                       f"{self.name}-dropout": self.dropout})
 
         # Update configuration for each model
         config.update(self.Encoder.get_config())
@@ -709,9 +621,10 @@ class CAMELOT(tf.keras.Model):
         return config
 
 
-CAMELOT_INPUT_PARAMS = ["num_clusters", "latent_dim", "seed", "output_dim", "name", "alpha", "beta",
+CAMELOT_INPUT_PARAMS = ["num_clusters", "latent_dim", "seed", "output_dim", "name", "alpha_1", "alpha_2", "alpha_3",
+                        "beta",
                         "regulariser_params", "dropout", "encoder_params", "identifier_params",
-                        "predictor_params", "cluster_rep_lr", "optimizer_init", "weighted_loss"]
+                        "predictor_params"]
 
 
 class Model(CAMELOT):
@@ -782,8 +695,8 @@ class Model(CAMELOT):
 
         return None
 
-    def train(self, data_info, lr: float = 0.001, epochs_init: int = 100, epochs: int = 100, bs: int = 32,
-              patience_epochs: int = 200, gpu: Union[str, None] = None, **kwargs):
+    def train(self, data_info, lr: float = 0.001, epochs_init_1: int = 100, epochs_init_2: int = 100, epochs: int = 100,
+              bs: int = 32, patience_epochs: int = 200, gpu: Union[str, None] = None, **kwargs):
         """
         Fit method for training CAMELOT model.
 
@@ -799,7 +712,8 @@ class Model(CAMELOT):
         """
         self.training_params.update({
             "lr": lr,
-            "epochs_init": epochs_init,
+            "epochs_init_1": epochs_init_1,
+            "epochs_init_2": epochs_init_2,
             "epochs": epochs,
             "bs": bs,
             "patience_epochs": patience_epochs,
@@ -815,8 +729,8 @@ class Model(CAMELOT):
         val_data = X_val, y_val
 
         print("-" * 20, "\n", "Initialising Model", sep="\n")
-        self.initialise_model(data=train_data, val_data=val_data, epochs=epochs_init,
-                              learning_rate=lr, batch_size=bs, patience_epochs=patience_epochs)
+        self.initialise_model(data=train_data, val_data=val_data, epochs_1=epochs_init_1, epochs_2 = epochs_init_2,
+                              learning_rate=lr, batch_size=bs, patience_epochs=patience_epochs, training_rate=lr)
 
         # Main Training phase
         print("-" * 20, "\n", "STARTING MAIN TRAINING PHASE")
@@ -917,8 +831,8 @@ class Model(CAMELOT):
         np.save(save_fd + "cluster_representations", cluster_rep_set, allow_pickle=True)
 
         # save init losses
-        init_loss_1.to_csv(track_fd + "enc_pred_init_loss.csv", index=True, header=True)
-        init_loss_2.to_csv(track_fd + "iden_init_loss.csv", index=True, header=True)
+        init_loss_1.to_csv(save_fd + "enc_pred_init_loss.csv", index=True, header=True)
+        init_loss_2.to_csv(save_fd + "iden_init_loss.csv", index=True, header=True)
 
         # Save attention weights
         np.savez(save_fd + "unnorm_weights", alpha=alpha, beta=beta, gamma=gamma)

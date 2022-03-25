@@ -84,7 +84,20 @@ def visualise_data_groups(data_info, **kwargs):
 
     # Get save path
     data_name = data_load_config["data_name"]
-    save_fd = f"visualisations/{data_name}/"
+    run_num = 1
+    SAVE_FD = f"visualisations/{data_name}/data/"
+
+    while os.path.exists(SAVE_FD + f"config{run_num}/data_load_config.json"):
+        with open(SAVE_FD + f"config{run_num}/data_load_config.json", "r") as f:
+            _load_existing_config = json.load(f)
+
+        if _load_existing_config != data_load_config:
+            run_num += 1
+
+        else:
+            break
+
+    save_fd = SAVE_FD + f"config{run_num}/"
 
     if not os.path.exists(save_fd):
         os.makedirs(save_fd)

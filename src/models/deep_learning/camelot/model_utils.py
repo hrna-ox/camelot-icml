@@ -9,12 +9,14 @@ import os
 
 import numpy as np
 import pandas as pd
+
 import tensorflow as tf
 import tensorflow.keras.callbacks as cbck
-from sklearn.metrics import adjusted_rand_score, davies_bouldin_score, calinski_harabasz_score
-from sklearn.metrics import normalized_mutual_info_score, silhouette_score
-from sklearn.metrics import roc_auc_score as roc
-from sklearn.metrics import average_precision_score as aps
+
+import matplotlib.pyplot as plt
+
+from sklearn.metrics import roc_auc_score, average_precision_score
+from sklearn.metrics import RocCurveDisplay, PrecisionRecallDisplay
 
 # ----------------------------------------------------------------------------------
 "Utility Functions and Global Params"
@@ -24,6 +26,10 @@ LOGS_DIR = "experiments/CAMELOT/"
 
 def tf_log(tensor):
     return tf.math.log(tensor + 1e-8)
+
+
+def tf_divide(tensor1, tensor2):
+    return tf.math.divide(tensor1, tensor2 + 1e-8)
 
 
 def np_log(array):
@@ -110,7 +116,7 @@ def l_clus(cluster_reps, name='embedding_sep_loss'):
     return loss
 
 
-def l_dist(clusters_prob, name="loss_clus_dist"):
+def l_clus_dist(clusters_prob, name="loss_clus_dist"):
     """
     Cluster distribution loss. Computes negative entropy of cluster distribution probability values.
     This is minimised when the cluster distribution is uniform (all clusters similar size).
@@ -132,52 +138,52 @@ def l_dist(clusters_prob, name="loss_clus_dist"):
     return neg_entropy
 
 
-# ----------------------------------------------------------------------------------
-"Callback methods to update training procedure."
-
-
-class CEClusSeparation(cbck.Callback):
+def l_pat_dist(clusters_prob):
     """
-    Callback method to print Normalised Cross-Entropy separation between cluster phenotypes.
-    Higher values indicate higher separation (which is good!)
+    Sample Cluster Entropy Loss. Computes negative entropy of cluster assignment over the batch.
+    This is minimised when all samples are confidently assigned.
 
     Params:
-    - validation_data: tuple of X_val, y_val data
-    - weighted: bool, indicating whether outcomes should be weighted. (default = False)
-    - interval: interval between epochs on which to print values. (default = 5)
+    - clusters_prob: array-like of shape (bs, K) of cluster_assignments distributions.
+    - name: name to give to operation.
+
+    Returns:
+    - loss_value: score indicating corresponding loss.
     """
 
-    def __init__(self, validation_data: tuple, weighted: bool = False, interval: int = 5):
-        super().__init__()
-        self.interval = interval
-        self.X_val, self.y_val = validation_data
+    # Compute Entropy
+    entropy = - tf.reduce_sum(clusters_prob * tf_log(clusters_prob))
 
-        # Compute outcome weights if weighted=True
-        if weighted is True:
-            self.weights = class_weighting(self.y_val)
+    # Compute negative entropy
+    batch_loss = tf.reduce_mean(entropy)
 
-        else:
-            self.weights = np.ones(shape=(self.y_val.shape[0]))
+    return batch_loss
 
-    def on_epoch_end(self, epoch, *args, **kwargs):
 
-        # Print information if matches interval epoch length
-        if epoch % self.interval == 0:
+def l_dist(y_pred, true_dist):
+    """
+    Computes KL divergence between probability assignments and true outcome distribution.
 
-            # Initialise callback value, and determine K
-            cbck_value, K = 0, self.model.K
-            clus_phenotypes = self.model.compute_cluster_phenotypes()
+    Params:
+    - y_pred: tensor of shape (N, num_outcs) of outcome probability assignments.
+    - true_dist: tensor of shape (num_outcs) of true outcome probability assignments.
 
-            # Iterate over all pairs of clusters and compute symmetric CE
-            for i in range(K):
-                for j in range(i + 1, K):
-                    cbck_value += - np.sum(clus_phenotypes[i, :] * np_log(clus_phenotypes[j, :]))
-                    cbck_value += - np.sum(clus_phenotypes[j, :] * np_log(clus_phenotypes[i, :]))
+    Returns:
+    - loss_value: score indicating corresponding loss.
+    """
 
-            # normalise and print output
-            cbck_value = cbck_value / (K * (K + 1))
+    # Compute pred outcome distribution
+    pred_dist = tf.reduce_mean(y_pred, axis=0)
 
-            print("End of Epoch {:d} - CE sep : {:.4f}".format(epoch, cbck_value))
+    # Compute KL
+    _log_divide = tf_log(tf_divide(pred_dist, true_dist))
+    batch_loss = tf.reduce_sum(pred_dist * _log_divide)
+
+    return batch_loss
+
+
+# --------------- CALLBACK METHODS ----------------------
+"Callback methods to update training procedure."
 
 
 class ConfusionMatrix(cbck.Callback):
@@ -227,7 +233,7 @@ class ConfusionMatrix(cbck.Callback):
             print("End of Epoch {:d} - Confusion matrix: \n {}".format(epoch, cm_output.astype(int)))
 
 
-class AUROC(cbck.Callback):
+class PrCurves(cbck.Callback):
     """
     Callback method to display AUROC value for predicted y.
 
@@ -236,32 +242,63 @@ class AUROC(cbck.Callback):
     - interval: interval between epochs on which to print values. (default = 5)
     """
 
-    def __init__(self, validation_data: tuple, interval: int = 5):
+    def __init__(self, validation_data: tuple, interval: int = 5, save_fd: str = None):
         super().__init__()
         self.interval = interval
         self.X_val, self.y_val = validation_data
+        self.C = self.y_val.shape[-1]
+        self.save_fd = save_fd
 
     def on_epoch_end(self, epoch, *args, **kwargs):
         if epoch % self.interval == 0:
             # Compute predictions
             y_pred = self.model(self.X_val).numpy()
 
+            # Initialise scores
+            fig1, ax1 = plt.subplots(nrows=2, ncols=2)
+            ax1 = ax1.reshape(-1)
+            fig2, ax2 = plt.subplots(nrows=2, ncols=2)
+            ax2 = ax2.reshape(-1)
+
             # Compute ROC
-            roc_auc_score = roc(y_true=self.y_val, y_score=y_pred,
-                                average=None, multi_class='ovr')
+            roc, prc = np.zeros(self.C), np.zeros(self.C)
+            for outc_ in range(self.C):
 
-            # Compute PRC
-            prc_score = np.zeros(self.y_val.shape[-1])
-            for outc_id in range(self.y_val.shape[-1]):
-                prc_score[outc_id] = aps(self.y_val[:, outc_id], y_pred[:, outc_id])
+                try:
 
-            print("End of Epoch {:d} - OVR ROC score: {}".format(epoch, roc_auc_score))
-            print("End of Epoch {:d} - OVR PRC score: {}".format(epoch, prc_score))
+                    # Get roc and prc values
+                    roc[outc_] = roc_auc_score(y_true=self.y_val[:, outc_], y_score=y_pred[:, outc_])
+                    prc[outc_] = average_precision_score(y_true=self.y_val[:, outc_], y_score=y_pred[:, outc_])
+
+                    # Plot Curves
+                    PrecisionRecallDisplay.from_predictions(y_true=self.y_val[:, outc_], y_pred=y_pred[:, outc_],
+                                                            ax=ax1[outc_])
+                    RocCurveDisplay.from_predictions(y_true=self.y_val[:, outc_], y_pred=y_pred[:, outc_], ax=ax2[outc_])
+
+                    # Fix figures
+                    ax1[outc_].set_xlabel("Sensitivity")
+                    ax1[outc_].set_ylabel("Specificity")
+                    ax2[outc_].set_xlabel("Recall")
+                    ax2[outc_].set_ylabel("Precision")
+
+                    ax1[outc_].set_title(f"ROC Curve for outcome {outc_}")
+                    ax1[outc_].set_title(f"PRC Curve for outcome {outc_}")
+
+                except ValueError:
+                    pass
+
+            # Save figures
+            if self.save_fd is not None:
+                fig1.savefig(self.save_fd + f"ROC_Curve_{epoch}")
+                fig2.savefig(self.save_fd + f"PR_Curve{epoch}")
+
+            print("End of Epoch {:d} - OVR ROC score: {}".format(epoch, roc))
+            print("End of Epoch {:d} - OVR PRC score: {}".format(epoch, prc))
 
 
 class PrintClusterInfo(cbck.Callback):
     """
-    Callback method to display cluster distribution information assignment.
+    Callback method to display cluster distribution information assignment, and cluster separation.
 
     Params:
     - validation_data: tuple of X_val, y_val data
@@ -279,107 +316,34 @@ class PrintClusterInfo(cbck.Callback):
             # Compute cluster_predictions
             clus_pred = self.model.compute_pis(self.X_val)
             clus_assign = self.model.clus_assign(self.X_val)
+            clus_phens = self.model.Predictor(self.model.cluster_rep_set).numpy()
 
             # Define K
             K = self.model.K
 
             # Compute "hard" cluster assignment numbers
             hard_cluster_num = np.zeros(shape=K)
-            for clus_id in range(self.K):
+            for clus_id in range(self.model.K):
                 hard_cluster_num[clus_id] = np.sum(clus_assign == clus_id)
 
             # Compute average cluster distribution
             avg_cluster_dist = np.mean(clus_pred, axis=0)
 
             # Print Information
-            print(f"End of Epoch {epoch:d} - hard_cluster_info {hard_cluster_num} and avg dist{avg_cluster_dist}")
+            print(f"End of Epoch {epoch:d} - Cluster Info", f"Clus dist: {hard_cluster_num}",
+                  f"Avg assignment: {avg_cluster_dist}", f"Phenotypes: {clus_phens}", sep="\n")
 
 
-class SupervisedTargetMetrics(cbck.Callback):
-    """
-    Callback method to display supervised target metrics: Normalised Mutual Information, Adjusted Rand Score and
-    Purity Score
-
-    Params:
-    - validation_data: tuple of X_val, y_val data
-    - interval: interval between epochs on which to print values. (default = 5)
-    """
-
-    def __init__(self, validation_data: tuple, interval: int = 5):
-        super().__init__()
-        self.interval = interval
-        self.X_val, self.y_val = validation_data
-
-    def on_epoch_end(self, epoch, *args, **kwargs):
-        if epoch % self.interval == 0:
-            # Compute y_pred, y_true in categorical format.
-            model_output = (self.model(self.X_val)).numpy()
-            class_pred = np.argmax(model_output, axis=-1)
-            class_true = np.argmax(self.y_val, axis=-1).reshape(-1)
-
-            # Target metrics
-            nmi = normalized_mutual_info_score(labels_true=class_true, labels_pred=class_pred)
-            ars = adjusted_rand_score(labels_true=class_true, labels_pred=class_pred)
-
-            print("End of Epoch {:d} - NMI {:.2f} , ARS {:.2f}".format(epoch, nmi, ars))
-
-
-class UnsupervisedTargetMetrics(cbck.Callback):
-    """
-    Callback method to display unsupervised target metrics: Davies-Bouldin Score, Calinski-Harabasz Score,
-    Silhouette Score
-
-    Params:
-    - validation_data: tuple of X_val, y_val data
-    - interval: interval between epochs on which to print values. (default = 5)
-    """
-
-    def __init__(self, validation_data: tuple, interval: int = 5):
-        super().__init__()
-        self.interval = interval
-        self.X_val, self.y_val = validation_data
-
-    def on_epoch_end(self, epoch, *args, **kwargs):
-        if epoch % self.interval == 0:
-            # Compute predictions and latent representations
-            latent_reps = self.model.Encoder(self.X_val)
-            pis_pred = (self.model.Identifier(latent_reps)).numpy()
-
-            # Convert to categorical
-            clus_pred = np.argmax(pis_pred, axis=-1)
-
-            # Reshape input data and allow feature comparison
-            X_val_2d = np.reshape(self.X_val, (self.X_val.shape[0], -1))
-
-            # Compute metrics
-            dbs = davies_bouldin_score(X_val_2d, labels=clus_pred)
-            dbs_l = davies_bouldin_score(latent_reps, labels=clus_pred)
-            chs = calinski_harabasz_score(X_val_2d, labels=clus_pred)
-            chs_l = calinski_harabasz_score(latent_reps, labels=clus_pred)
-            sil = silhouette_score(X=X_val_2d, labels=clus_pred, random_state=self.model.seed)
-            sil_l = silhouette_score(X=latent_reps, labels=clus_pred, random_state=self.model.seed)
-
-            print(f"""End of Epoch {epoch:d} (score, latent score): 
-                        DBS {dbs:.2f}, {dbs_l:.2f}   
-                        CHS {chs:.2f}, {chs_l:.2f}  
-                        SIL {sil:.2f}, {sil_l:.2f}""")
-
-
-def cbck_list(summary_name: str, interval: int = 5, validation_data: tuple = ()):
+def cbck_list(summary_name: str, interval: int = 5, validation_data: tuple = (), save_fd: str = None):
     """
     Shorthand for callbacks above.
 
     Params:
     - summary_name: str containing shorthands for different callbacks.
+    - save_fd: str containing save path.
     - interval: int interval to print information on.
     """
     extra_callback_list = []
-
-    if "auc" in summary_name.lower() or "roc" in summary_name.lower():
-        extra_callback_list.append(AUROC(interval=interval, validation_data=validation_data))
-
-    if "clus_sep" in summary_name.lower() or "clus_phen" in summary_name.lower():
-        extra_callback_list.append(CEClusSeparation(interval=interval, validation_data=validation_data))
 
     if "cm" in summary_name.lower() or "conf_matrix" in summary_name.lower():
         extra_callback_list.append(ConfusionMatrix(interval=interval, validation_data=validation_data))
@@ -387,11 +351,8 @@ def cbck_list(summary_name: str, interval: int = 5, validation_data: tuple = ())
     if "clus_info" in summary_name.lower():
         extra_callback_list.append(PrintClusterInfo(interval=interval, validation_data=validation_data))
 
-    if "sup_scores" in summary_name.lower():
-        extra_callback_list.append(SupervisedTargetMetrics(interval=interval, validation_data=validation_data))
-
-    if "unsup_scores" in summary_name.lower():
-        extra_callback_list.append(UnsupervisedTargetMetrics(interval=interval, validation_data=validation_data))
+    if "auc" in summary_name.lower() or "prc" in summary_name.lower() or "curve" in summary_name.lower():
+        extra_callback_list.append(PrCurves(interval=interval, validation_data=validation_data, save_fd=save_fd))
 
     return extra_callback_list
 
@@ -439,7 +400,7 @@ def get_callbacks(validation_data, data_name: str, track_loss: str, interval: in
     # ------------------ Start Loading callbacks ---------------------------
 
     # Load custom callbacks first
-    callbacks.extend(cbck_list(other_cbcks, interval, validation_data=validation_data))
+    callbacks.extend(cbck_list(other_cbcks, interval, validation_data=validation_data, save_fd=save_fd))
 
     # Model Weight saving callback
     checkpoint = cbck.ModelCheckpoint(filepath=save_fd + "models/checkpoints/epoch-{epoch}", save_best_only=True,
