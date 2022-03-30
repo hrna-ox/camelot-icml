@@ -22,6 +22,34 @@ from sklearn.metrics.cluster import contingency_matrix
 ADMISSIBLE_RESULT_KEYS = ["y_pred", "outc_pred", "y_true", "pis_pred", "clus_pred", "clus_phenotypes"]
 
 
+def _get_cm_values(has_label_true: np.ndarray, has_label_pred: np.ndarray) -> dict:
+    """
+    Get dictionary of TP, FN, FP, TN values given a binary label indicator and a vector of binary predictions.
+
+    Params:
+    - has_label_true: np.ndarray of shape (N, ) with {0, 1} entries.
+    - has_label_pred: np.ndarray of shape (N, ) with {0, 1} entries.
+    
+    Returns:
+    - Dictionary of True/False Positives/Negatives
+    """
+    
+    # Both equal to 1 for true positives
+    tp = ((has_label_true==1) & (has_label_pred==1)).sum()
+
+    # True=1, False=0 for false negatives
+    fn = ((has_label_true==1) & (has_label_pred==0)).sum()
+
+    # True=0, False=1 for false positives
+    fp = ((has_label_true==0) & (has_label_pred==1)).sum()
+
+    # True=0, False=0 for true negatives
+    tn = ((has_label_true==0) & (has_label_pred==0)).sum()
+
+    # Return dictionary
+    return {"tp": tp, "fn": fn, "fp": fp, "tn": tn}
+
+
 def _custom_cm_over_threshold(y_true: np.ndarray, y_score: np.ndarray) -> tuple:
     """
     Compute True/False Positive/Negatives of multi-class predictions y_true, y_score with a commonly variying threshold.
@@ -48,16 +76,77 @@ def _custom_cm_over_threshold(y_true: np.ndarray, y_score: np.ndarray) -> tuple:
         y_pred_thresh = (y_score >= eps).astype(int)
 
         # Iterate over outcomes
-        for _outc_id in range(y_true.shape[-1]):
+        for outc_id in range(y_true.shape[-1]):
 
-            # Get metrics
-            tp_value, fn_value, fp_value, tn_value = _get_cm_values(y_true[:, _outc_id], y_pred_thresh[:, _outc_id])
+            # Get conf matrix values
+            conf_matrix = _get_cm_values(y_true[:, outc_id], y_pred_thresh[:, outc_id])
+
+            # Update scores
+            tp[thresh_id, outc_id] = conf_matrix["tp"]
+            fn[thresh_id, outc_id] = conf_matrix["fn"]
+            fp[thresh_id, outc_id] = conf_matrix["fp"]
+            tn[thresh_id, outc_id] = conf_matrix["tn"]
+
+    return thresholds, tp, fn, fp, tn
+
 
 def custom_auc(y_true: np.ndarray, y_score: np.ndarray) -> np.ndarray:
-    return None
+    """
+    Compute Custom Area-under-the-receiver-curve on multi-class setting. The score is computed as regular AUROC, except that the thresholds per each class
+    are not allowed to vary independently. 
+
+    For each threshold, labels with value higher than epsilon are flagged up, consequently AUROC per each class is computed. Area under the curve is consequently
+    computed as regular.
+
+    Params:
+    - y_true: np.ndarray of shape (N, num_outcs) with one-hot encoded true label encodings.
+    - y_score: np.ndarray of shape (N, num_outcs) with predicted probability outcome assignments.
+
+    Returns:
+        area: np.array of dimension (y_score.shape[-1], ) with corresponding area eestimations.
+    """
+    _ , tp, fn, fp, tn = _custom_cm_over_threshold(y_true=y_true, y_score=y_score)
+
+    # Compute Sensitivity and Specificity
+    tpr = tp / (tp + fn)
+    fpr = fp / (fp + tn)
+
+    # Ensure fpr always non-increasing
+    assert np.all(np.diff(fpr[1:, :],axis=0) <= 0, axis=None)
+
+    # Compute area under curve with trapezoidal rule - multiply by -1 as fpr is decreasing
+    area = - np.trapz(y=tpr, x=fpr, axis=0)
+
+    return area
+    
 
 def custom_prc(y_true: np.ndarray, y_score: np.ndarray) -> np.ndarray:
-    return None
+    """
+    Compute custom area-under-the-precision-recall curve on multi-class setting. The score is computed as regular AUPRC, except thresholds per each class
+    are not allowed to vary independently, and apply to each class simultaneously.
+    
+    Params:
+    - y_true: np.ndarray of shape (N, num_outcs) with one-hot encoded true label encodings.
+    - y_score: np.ndarray of shape (N, num_outcs) with predicted probability outcome assignments.
+
+    Returns:
+        area: np.array of dimension (y_score.shape[-1], ) with corresponding area eestimations.
+    
+    """
+    _ , tp, fn, fp, tn = _custom_cm_over_threshold(y_true=y_true, y_score=y_score)
+
+    # Compute Precision and recall
+    precision = np.divide(tp ,tp + fp, out=np.zeros_like(tp), where=tp+fp==0)
+    recall = tp / (tp + fn)
+
+    # Ensure always decreasing
+    assert np.all(np.diff(recall, axis=0) <= 0, axis=None)
+
+    # Compute Area under curve - need to multiply by -1 as recall is decreasing (and not increasing)
+    area = - np.trapz(y=precision, x=recall, axis=0)
+
+    return area
+
 
 def get_clus_outc_numbers(y_true: np.ndarray, clus_pred: np.ndarray):
     """
@@ -186,6 +275,11 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
             - "ARI": Float value indicating Adjusted Rand Index performance.
             - "NMI": Float value indicating Normalised Mutual Information Score performance.
     """
+    if isinstance(y_pred, pd.DataFrame):
+        y_pred = y_pred.values
+
+    if isinstance(y_true, pd.DataFrame):
+        y_true = y_true.values
 
     # Get PRC
     prc, auc = np.zeros(shape=y_pred.shape[-1]), np.zeros(shape=y_pred.shape[-1])
@@ -216,7 +310,43 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
         ax[1].set_title(f"PRC Curve for outcome {outc_id}")
 
         # Add to curves
-        roc_prc_curves[outc_id] = fig, ax
+        roc_prc_curves[f"Curves {outc_id}"] = fig, ax
+
+    # Get custom ROC and PRC Curves
+    _, tp, fn, fp, tn = _custom_cm_over_threshold(y_true=y_true, y_score=y_pred)
+    for outc_id in range(y_pred.shape[-1]):
+
+        # Get sensitivity, sensitivity precision and recall
+        tpr = tp / (tp + fn)
+        fpr = fp / (fp + tn)
+        precision = np.divide(tp ,tp + fp, out=np.zeros_like(tp), where=tp+fp==0)
+        recall = tp / (tp + fn)
+
+        # Initialise plots
+        fig, ax = plt.subplots(nrows=1, ncols=2)
+        baseline = np.linspace(0, 1, num=1000)
+
+        # Plot AUROC
+        ax[0].plot(fpr[::-1], tpr[::-1], linestyle="--", color="red", label="pred curve")
+        ax[0].plot(baseline, baseline, linestyle="-", color="blue", label="baseline")
+        
+        ax[0].set_xlabel("FPR")
+        ax[0].set_ylabel("TPR")
+        ax[0].set_title(f"Custom ROC Curve for outcome {outc_id}")
+        ax[0].legend()
+
+        # Plot PRC
+        ax[1].plot(recall[::-1], precision[::-1], linestyle="--", color="red", label="pred curve")
+        ax[1].plot(baseline, baseline, linestyle="-", color="blue", label="baseline")
+
+        ax[1].set_xlabel("Recall")
+        ax[1].set_ylabel("Precision")
+        ax[1].set_title(f"Custom PRC Curve for outcome {outc_id}")
+        ax[1].legend()
+
+        # Add to curves
+        roc_prc_curves[f"Custom Curves {outc_id}"] = fig, ax
+
 
     # Compute custom AUROC and AUPRC
     auc_common = custom_auc(y_true=y_true, y_score=y_pred)
@@ -247,6 +377,8 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
     scores_dic = {
         "ROC-AUC": auc,
         "ROC-PRC": prc,
+        "ROC-AUC-custom": auc_common,
+        "ROC-PRC-custom": prc_common,
         "F1": f1,
         "Recall": rec,
         "Precision": prec,
@@ -254,7 +386,7 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
         "NMI": nmi
     }
 
-    return scores_dic, cm, RocCurveDisplay
+    return scores_dic, cm, roc_prc_curves
 
 
 def compute_from_eas_scores(y_true: np.ndarray, scores: np.ndarray, outc_names: np.ndarray = None, **kwargs) -> dict:

@@ -1,8 +1,8 @@
 {
    "lr": 0.0005,
-   "epochs_init_1": 10,
-   "epochs_init_2": 10,
-   "epochs": 200,
+   "epochs_init_1": 5,
+   "epochs_init_2": 5,
+   "epochs": 5,
    "bs": 256,
    "cbck_str": "auc-cm-clus_info",
    "patience_epochs": 100,

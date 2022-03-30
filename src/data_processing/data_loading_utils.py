@@ -256,7 +256,7 @@ def get_ids(data_name):
         id_col, time_col, needs_time_to_end = "subject_id", "charttime", True
 
     elif "MIMIC" in data_name:
-        id_col, time_col, needs_time_to_end = "stay_id", "sampled_time_to_end(1H)", False
+        id_col, time_col, needs_time_to_end = "hadm_id", "sampled_time_to_end(1H)", False
 
     elif "SAMPLE" in data_name:
         id_col, time_col, needs_time_to_end = None, None, None

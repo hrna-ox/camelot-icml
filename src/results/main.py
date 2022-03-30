@@ -94,11 +94,11 @@ def evaluate(y_true=None, y_pred=None, clus_pred=None, data_info=None, save_fd=N
     scores = {**scores, **clus_metrics}
 
     # Save
-    # for outc_id, outc in enumerate(outc_names):
-    #
-    #     # Get fig, ax and save
-    #     fig_id, ax_id = Roc_curves[outc_id]
-    #     fig_id.savefig(save_fd + f"ROC-PRC-{outc}")
+    for key, value in Roc_curves.items():
+    
+        # Get fig, ax and save
+        fig, _ = value
+        fig.savefig(save_fd + key)
 
 
     with open(save_fd + "scores.csv", "w+", newline="\n") as f:
