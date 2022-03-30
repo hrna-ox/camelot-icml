@@ -22,6 +22,43 @@ from sklearn.metrics.cluster import contingency_matrix
 ADMISSIBLE_RESULT_KEYS = ["y_pred", "outc_pred", "y_true", "pis_pred", "clus_pred", "clus_phenotypes"]
 
 
+def _custom_cm_over_threshold(y_true: np.ndarray, y_score: np.ndarray) -> tuple:
+    """
+    Compute True/False Positive/Negatives of multi-class predictions y_true, y_score with a commonly variying threshold.
+
+    Params:
+    - y_true: np.ndarray of shape (N, num_outcs) with one-hot encoded true label encodings.
+    - y_score: np.ndarray of shape (N, num_outcs) with predicted probability outcome assignments.
+
+    Returns:
+        Tuple (threshold, TP, FN, FP, TN) of T/F P/N values for a common threshold list.
+    """
+    # Compute varying thresholds
+    _min, _max = np.min(y_score), np.max(y_score)
+    thresholds = np.linspace(start=_min, stop=_max, num=10000, endpoint=True)
+
+    # Initialise output variables
+    shape = (10000, y_true.shape[-1])
+    tp, fn, fp, tn = np.zeros(shape), np.zeros(shape), np.zeros(shape), np.zeros(shape)
+
+    # Iterate over thresholds
+    for thresh_id, eps in enumerate(thresholds):
+
+        # Convert scores to binary
+        y_pred_thresh = (y_score >= eps).astype(int)
+
+        # Iterate over outcomes
+        for _outc_id in range(y_true.shape[-1]):
+
+            # Get metrics
+            tp_value, fn_value, fp_value, tn_value = _get_cm_values(y_true[:, _outc_id], y_pred_thresh[:, _outc_id])
+
+def custom_auc(y_true: np.ndarray, y_score: np.ndarray) -> np.ndarray:
+    return None
+
+def custom_prc(y_true: np.ndarray, y_score: np.ndarray) -> np.ndarray:
+    return None
+
 def get_clus_outc_numbers(y_true: np.ndarray, clus_pred: np.ndarray):
     """
     Compute contingency matrix: entry (i,j) denotes the number of patients with true sample i and predicted clus j.
@@ -150,14 +187,12 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
             - "NMI": Float value indicating Normalised Mutual Information Score performance.
     """
 
-    # Compute ROC-AUC first given y_pred and y_true format
-    auc = roc_auc_score(y_true, y_pred, average=avg, multi_class="ovr")
-
     # Get PRC
-    prc = np.zeros(shape=y_pred.shape[-1])
+    prc, auc = np.zeros(shape=y_pred.shape[-1]), np.zeros(shape=y_pred.shape[-1])
     for outc_id in range(y_pred.shape[-1]):
 
-        # Update prc scores
+        # Update prc and auc scores
+        auc[outc_id] = roc_auc_score(y_true=y_true[:, outc_id], y_score=y_pred[:, outc_id], average=avg)
         prc[outc_id] = average_precision_score(y_true=y_true[:, outc_id], y_score=y_pred[:, outc_id], average=avg)
 
     # GET ROC AND PRC CURVES
@@ -183,6 +218,9 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
         # Add to curves
         roc_prc_curves[outc_id] = fig, ax
 
+    # Compute custom AUROC and AUPRC
+    auc_common = custom_auc(y_true=y_true, y_score=y_pred)
+    prc_common = custom_prc(y_true=y_true, y_score=y_pred)
 
     # Convert input arrays to categorical labels
     labels_true, labels_pred = np.argmax(y_true, axis=1), np.argmax(y_pred, axis=1)
@@ -234,7 +272,7 @@ def compute_from_eas_scores(y_true: np.ndarray, scores: np.ndarray, outc_names: 
     - dict with scores ROC-AUC, F1, Recall, Precision per class
     """
 
-    # Useful infos
+    # Useful info
     num_outcs = y_true.shape[-1]
 
     if outc_names is None:
