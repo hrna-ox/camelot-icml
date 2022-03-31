@@ -1,16 +1,18 @@
 """
 Utility function file for binary prediction tasks.
 
-Protected attributes (_X) take different inputs, main functions (Y) require inputs (y_true, y_score).
+Protected attributes (_X) have variable input, main functions (Y) have inputs (y_true, y_score).
 """
 
 
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.cm import get_cmap
 
 
-def _get_cm_values(has_label_true: np.ndarray, has_label_pred: np.ndarray) -> dict:
+def _get_single_cm_values(has_label_true: np.ndarray, has_label_pred: np.ndarray) -> dict:
     """
-    Get dictionary of TP, FN, FP, TN values given a binary label indicator and a vector of binary predictions.
+    Get dictionary of TP, FN, FP, TN values given a binary label indicator and binary predictions.
 
     Params:
     - has_label_true: np.ndarray of shape (N, ) with {0, 1} entries.
@@ -36,37 +38,41 @@ def _get_cm_values(has_label_true: np.ndarray, has_label_pred: np.ndarray) -> di
     return {"tp": tp, "fn": fn, "fp": fp, "tn": tn}
 
 
-def _custom_cm_over_threshold(y_true: np.ndarray, y_score: np.ndarray, num: int = 1e-6) -> dict:
+def _get_cm_values(y_true: np.ndarray, y_score: np.ndarray, num: int = 1e6, mode: str = "custom") -> dict:
     """
     Compute True/False Positive/Negatives of multi-class predictions y_true, y_score with a commonly varying threshold.
 
     Params:
-    - y_true: np.ndarray of shape (N, num_outcs) with one-hot encoded true label encodings.
-    - y_score: np.ndarray of shape (N, num_outcs) with predicted probability outcome assignments.
-    - num: steps to consider a sliding scale over
+    - y_true, y_score: np.ndarray of shape (N, num_outcs)
+    - num: int describing number of steps to compute intervals for. (default = 1e6)
+    - mode: str, compute custom version of multi-class averaging or not. (Default="custom")
 
     Returns:
-        Tuple (threshold, TP, FN, FP, TN) of T/F P/N values for a common threshold list.
+        dict (threshold, TP, FN, FP, TN) of T/F P/N values for a common threshold list.
     """
-
-    # Compute varying thresholds
-    _min, _max = np.min(y_score), np.max(y_score)
-    thresholds = np.linspace(start=_min, stop=_max, num=num, endpoint=True)
-
     # Initialise output variables
-    shape = (num, y_true.shape[-1])
+    shape, num_outcs = (num, y_true.shape[-1]), y_true.shape[-1]
     tp, fn, fp, tn = np.zeros(shape), np.zeros(shape), np.zeros(shape), np.zeros(shape)
 
-    # Iterate over thresholds
-    for thresh_id, eps in enumerate(thresholds):
+    if mode=="custom":
+        # Compute thresholds per each class separately
+        _min, _max = np.min(y_score, axis=0), np.max(y_score, axis=0)
+        thresholds = np.linspace(start=_min, stop=_max, num=num)
 
-        # Convert scores to binary
-        y_pred_thresh = (y_score >= eps).astype(int)
+    else:
+        # Compute thresholds commonly to all classes
+        _min, _max = np.min(y_score), np.max(y_score)
+        thresholds = np.repeat(np.linspace(start=_min, stop=_max, num=num).reshape(-1, 1), repeats=num_outcs, axis=-1)
 
-        # Iterate over outcomes
-        for outc_id in range(y_true.shape[-1]):
+    # Iterate over outcomes and thresholds
+    for outc_id in range(num_outcs):
+        for thresh_id, eps in enumerate(thresholds[:, outc_id]):    
+
+            # Convert scores to binary
+            y_pred_thresh = (y_score >= eps).astype(int)
+
             # Get conf matrix values
-            conf_matrix = _get_cm_values(y_true[:, outc_id], y_pred_thresh[:, outc_id])
+            conf_matrix = _get_single_cm_values(y_true[:, outc_id], y_pred_thresh[:, outc_id])
 
             # Update scores
             tp[thresh_id, outc_id] = conf_matrix["tp"]
@@ -77,9 +83,34 @@ def _custom_cm_over_threshold(y_true: np.ndarray, y_score: np.ndarray, num: int 
     return {"thresholds": thresholds, "tp": tp, "fn": fn, "fp": fp, "tn": tn}
 
 
-def custom_auc(y_true: np.ndarray, y_score: np.ndarray) -> np.ndarray:
+def _compute_bin_metrics(y_true: np.ndarray, y_score: np.ndarray, **kwargs) -> dict:
     """
-    Compute Custom Area-under-the-receiver-curve on multi-class setting. The score is computed as regular AUROC, except
+    Compute True Positive Rate (TPR), False Positive Rate (FPR), recall and precision given
+    multi-class true labels and predicted scores.
+
+    Returns:
+    - Dict with corresponding scores, and list of thresholds. Scores are of shape (num_threshs, num_outcs)
+    """
+    threshs, tp, fn, fp, tn = _get_cm_values(y_true=y_true, y_score=y_score, **kwargs).values()
+
+    # Compute sensitivity (TPR) and 1 - specificity (FPR)
+    tpr = tp / (tp + fn)                                   # tpr = tp / true_positive
+    fpr = fp / (fp + tn)                                   # fpr = fp / true_negative
+
+    # Compute recall and precision
+    recall = tp / (tp + fn)                                 # recall = tpr
+    precision = tp / (tp + fp)                              # precision = tp / predicted positive
+
+    # Need to be careful when tp+fp==0, precision is 1 if there are NO False negatives (follows gerbil package implementation)
+    cond = tp+fp==0
+    precision[cond] = 1
+
+    return {"thresholds": threshs, "tpr": tpr, "fpr": fpr, "recall": recall, "precision": precision}
+
+
+def custom_auc_auprc(y_true: np.ndarray, y_score: np.ndarray, mode: str = "custom", **kwargs) -> np.ndarray:
+    """
+    Compute Custom Area-under-the-receiver-curve and precision-recall curve on multi-class setting. The score is computed as regular AUROC, except
     that the thresholds per each class are not allowed to vary independently.
 
     For each threshold, labels with value higher than epsilon are flagged up, consequently AUROC per each class is
@@ -88,49 +119,71 @@ def custom_auc(y_true: np.ndarray, y_score: np.ndarray) -> np.ndarray:
     Params:
     - y_true: np.ndarray of shape (N, num_outcs) with one-hot encoded true label encodings.
     - y_score: np.ndarray of shape (N, num_outcs) with predicted probability outcome assignments.
+    - mode: str, indicates whether to make custom AUROC computation or use standard AUROC. (default="custom")
 
     Returns:
         area: np.array of dimension (y_score.shape[-1], ) with corresponding area estimations.
     """
-    metrics_dic = _custom_cm_over_threshold(y_true=y_true, y_score=y_score)
-    tp, fn, fp, tn = metrics_dic["tp"], metrics_dic["fn"], metrics_dic["fp"], metrics_dic["tn"]
+    metrics_dic = _compute_bin_metrics(y_true=y_true, y_score=y_score, mode=mode, **kwargs)
 
-    # Compute Sensitivity and Specificity
-    tpr = tp / (tp + fn)
-    fpr = fp / (fp + tn)
+    # Unpack tpr and fpr
+    tpr, fpr = metrics_dic["tpr"], metrics_dic["fpr"]
+    assert np.all(np.diff(fpr,axis=0) <=0)            # Check FPR decreases as threshold increases 
 
-    # Ensure fpr always non-increasing
-    assert np.all(np.diff(fpr[1:, :], axis=0) <= 0, axis=None)
+    # Compute area under curve using trapezium rule
+    auroc = np.trapz(y=tpr[::-1, :], x=fpr[::-1, :], axis=0)
 
-    # Compute area under curve with trapezoidal rule - multiply by -1 as fpr is decreasing
-    area = - np.trapz(y=tpr, x=fpr, axis=0)
+    # Do the same for recall and precision
+    precision, recall = metrics_dic["precision"], metrics_dic["recall"]
+    auprc = np.trapz(y=precision[::-1, :], x=recall[::-1, :], axis=0)
 
-    return area
+    return {"AUROC": auroc, "AUPRC": auprc}
 
-
-def custom_prc(y_true: np.ndarray, y_score: np.ndarray) -> np.ndarray:
+def plot_auc_auprc(y_true: np.ndarray, y_score: np.ndarray, mode: str = "custom", outc_names: list = None, **kwargs):
     """
-    Compute custom area-under-the-precision-recall curve on multi-class setting. The score is computed as regular AUPRC,
-     except thresholds per each class are not allowed to vary independently, and apply to each class simultaneously.
-
+    Make plots for Receiver-Operating-curves and Precision-Recall curves.
+    
     Params:
-    - y_true: np.ndarray of shape (N, num_outcs) with one-hot encoded true label encodings.
-    - y_score: np.ndarray of shape (N, num_outcs) with predicted probability outcome assignments.
-
-    Returns:
-        area: np.array of dimension (y_score.shape[-1], ) with corresponding area estimations.
-
+    - y_true: np.ndarray of shape (N, num_outcs) with one-hot label encodings.
+    - y_score: np.ndarray of shape (N, num_outcs) with predicted label assignments.
+    - mode: str, indicates whether to proceed with custom AUROC computation or use standard.
+    - outc_names: List or None, if names are provided, add these to plots.
+    - kwargs: any other parameters (number of steps for curve estimation.
     """
-    _, tp, fn, fp, tn = _custom_cm_over_threshold(y_true=y_true, y_score=y_score)
+    colors = get_cmap("tab10").colors
 
-    # Compute Precision and recall
-    precision = np.divide(tp, tp + fp, out=np.zeros_like(tp), where=tp + fp == 0)
-    recall = tp / (tp + fn)
+    # Manually
+    if outc_names is None:
+        num_outcs = y_true.shape[-1]
+        outc_names = list(range(1, 1 + num_outcs))
 
-    # Ensure always decreasing
-    assert np.all(np.diff(recall, axis=0) <= 0, axis=None)
+    # Load metrics
+    _, tpr, fpr, precision, recall = _compute_bin_metrics(y_true, y_score, mode=mode, **kwargs).values()
+    auroc, auprc = custom_auc_auprc(y_true, y_score, mode=mode, **kwargs).values()
 
-    # Compute Area under curve - need to multiply by -1 as recall is decreasing (and not increasing)
-    area = - np.trapz(y=precision, x=recall, axis=0)
+    # Initialise plots
+    fig, ax = plt.subplots(nrows=1, ncols=2, sharex="all", sharey="all")
+    outc_id = 0
 
-    return area
+    for outc_id, outc in enumerate(outc_names):
+        ax[0].plot(fpr[::-1], tpr[::-1], linestyle="--", color=colors[outc_id], label=f"{outc} - auroc {auroc[outc_id]:.3f}")
+        ax[1].plot(recall[::-1], precision[::-1], linestyle="--", color=colors[outc_id], label=f"{outc} - auprc {auprc[outc_id]:.3f}")
+
+    # Add baseline 0.5 to AUROC plot
+    baseline = np.linspace(0, 1, num=1000)
+    ax[0].plot(baseline, baseline, label="random", linestyle="-", color=colors[1 + outc_id])
+
+    # Add labels
+    ax[0].set_xlabel("FPR")
+    ax[0].set_ylabel("TPR")
+    ax[1].set_xlabel("Recall")
+    ax[1].set_ylabel("Precision")
+
+    ax[0].set_title("ROC Curve")
+    ax[1].set_title("PRC Curve")
+
+    # Set suptitle and clearlayout
+    fig.suptitle(f"{mode} Curves")
+    plt.tight_layout()
+
+    return fig, ax
