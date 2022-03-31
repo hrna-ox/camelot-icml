@@ -2,18 +2,9 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="e4ecba8e-2901-44aa-817c-245a30485212" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/src/results/binary_prediction_utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data_processing/MIMIC/data_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_processing/MIMIC/data_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data_processing/MIMIC/outcomes_processing.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_processing/MIMIC/outcomes_processing.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data_processing/MIMIC/vitals_processing.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_processing/MIMIC/vitals_processing.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data_processing/data_loading_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_processing/data_loading_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/camelot/model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/camelot/model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/deep_learning/camelot/model_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/deep_learning/camelot/model_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/results/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/results/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/training/data_config.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/training/data_config.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/training/model_config.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/training/model_config.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/training/training_config.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/training/training_config.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/visualisation/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/visualisation/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/results/results_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/results/results_utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -133,7 +124,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/src/models/deep_learning/camelot/model.py</url>
-          <line>318</line>
+          <line>316</line>
           <option name="timeStamp" value="5" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
