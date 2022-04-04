@@ -18,6 +18,8 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import roc_auc_score, average_precision_score
 from sklearn.metrics import RocCurveDisplay, PrecisionRecallDisplay
 
+from src.results.binary_prediction_utils import custom_auc_auprc, plot_auc_auprc
+
 # ----------------------------------------------------------------------------------
 "Utility Functions and Global Params"
 
@@ -254,46 +256,12 @@ class PrCurves(cbck.Callback):
             # Compute predictions
             y_pred = self.model(self.X_val).numpy()
 
-            # Initialise scores
-            fig1, ax1 = plt.subplots(nrows=2, ncols=2)
-            ax1 = ax1.reshape(-1)
-            fig2, ax2 = plt.subplots(nrows=2, ncols=2)
-            ax2 = ax2.reshape(-1)
+            # Get auroc and auprc both versions
+            auroc, auprc = custom_auc_auprc(self.y_val, y_pred, mode="OvR", num=10000).values()
+            auroc_custom, auprc_custom = custom_auc_auprc(self.y_val, y_pred, "custom", num=10000).values()
 
-            # Compute ROC
-            roc, prc = np.zeros(self.C), np.zeros(self.C)
-            for outc_ in range(self.C):
-
-                try:
-
-                    # Get roc and prc values
-                    roc[outc_] = roc_auc_score(y_true=self.y_val[:, outc_], y_score=y_pred[:, outc_])
-                    prc[outc_] = average_precision_score(y_true=self.y_val[:, outc_], y_score=y_pred[:, outc_])
-
-                    # Plot Curves
-                    PrecisionRecallDisplay.from_predictions(y_true=self.y_val[:, outc_], y_pred=y_pred[:, outc_],
-                                                            ax=ax1[outc_])
-                    RocCurveDisplay.from_predictions(y_true=self.y_val[:, outc_], y_pred=y_pred[:, outc_], ax=ax2[outc_])
-
-                    # Fix figures
-                    ax1[outc_].set_xlabel("Sensitivity")
-                    ax1[outc_].set_ylabel("Specificity")
-                    ax2[outc_].set_xlabel("Recall")
-                    ax2[outc_].set_ylabel("Precision")
-
-                    ax1[outc_].set_title(f"ROC Curve for outcome {outc_}")
-                    ax1[outc_].set_title(f"PRC Curve for outcome {outc_}")
-
-                except ValueError:
-                    pass
-
-            # Save figures
-            if self.save_fd is not None:
-                fig1.savefig(self.save_fd + f"ROC_Curve_{epoch}")
-                fig2.savefig(self.save_fd + f"PR_Curve{epoch}")
-
-            print("End of Epoch {:d} - OVR ROC score: {}".format(epoch, roc))
-            print("End of Epoch {:d} - OVR PRC score: {}".format(epoch, prc))
+            print(f"End of Epoch {epoch:d} - \nauroc: {auroc} \n auprc {auprc}")
+            print(f"End of Epoch {epoch:d} - \ncustom auroc: {auroc_custom} \ncustom auprc {auprc_custom}")
 
 
 class PrintClusterInfo(cbck.Callback):
@@ -401,11 +369,6 @@ def get_callbacks(validation_data, data_name: str, track_loss: str, interval: in
 
     # Load custom callbacks first
     callbacks.extend(cbck_list(other_cbcks, interval, validation_data=validation_data, save_fd=save_fd))
-
-    # Model Weight saving callback
-    checkpoint = cbck.ModelCheckpoint(filepath=save_fd + "models/checkpoints/epoch-{epoch}", save_best_only=True,
-                                      monitor=track_loss, save_freq="epoch")
-    callbacks.append(checkpoint)
 
     # Logging Loss values)
     csv_logger = cbck.CSVLogger(filename=save_fd + "training/loss_tracker", separator=",", append=False)

@@ -5,9 +5,9 @@
    "seed": 2323,
    "name": "CAMELOT",
    "alpha_1": 0.01,
-   "alpha_2": 0.01,
-   "alpha_3": 1,
-   "beta": 1,
+   "alpha_2": 0.1,
+   "alpha_3": 0.1,
+   "beta": 10,
    "regulariser_params": [
       0.01,
       0.01
@@ -22,12 +22,7 @@
       "hidden_nodes": 30
    },
    "predictor_params": {
-      "hidden_layers": 1,
+      "hidden_layers": 2,
       "hidden_nodes": 30
-   },
-   "C": 0.1,
-   "probability": true,
-   "n_estimators": 200,
-   "objective": "softmax",
-   "n_clusters": 8
+   }
 }

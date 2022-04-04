@@ -38,9 +38,9 @@ def _get_single_cm_values(has_label_true: np.ndarray, has_label_pred: np.ndarray
     return {"tp": tp, "fn": fn, "fp": fp, "tn": tn}
 
 
-def _get_cm_values(y_true: np.ndarray, y_score: np.ndarray, num: int = 1e6, mode: str = "custom") -> dict:
+def _get_cm_values(y_true, y_score, num: int = 10000, mode: str = "custom") -> dict:
     """
-    Compute True/False Positive/Negatives of multi-class predictions y_true, y_score with a commonly varying threshold.
+    Compute True/False Positive/Negatives of multi-class predictions y_true, y_score.
 
     Params:
     - y_true, y_score: np.ndarray of shape (N, num_outcs)
@@ -51,7 +51,7 @@ def _get_cm_values(y_true: np.ndarray, y_score: np.ndarray, num: int = 1e6, mode
         dict (threshold, TP, FN, FP, TN) of T/F P/N values for a common threshold list.
     """
     # Initialise output variables
-    shape, num_outcs = (num, y_true.shape[-1]), y_true.shape[-1]
+    shape, num_outcs = (int(num), y_true.shape[-1]), y_true.shape[-1]
     tp, fn, fp, tn = np.zeros(shape), np.zeros(shape), np.zeros(shape), np.zeros(shape)
 
     if mode=="custom":
@@ -62,11 +62,12 @@ def _get_cm_values(y_true: np.ndarray, y_score: np.ndarray, num: int = 1e6, mode
     else:
         # Compute thresholds commonly to all classes
         _min, _max = np.min(y_score), np.max(y_score)
-        thresholds = np.repeat(np.linspace(start=_min, stop=_max, num=num).reshape(-1, 1), repeats=num_outcs, axis=-1)
+        thresholds = np.repeat(np.linspace(start=_min, stop=_max, num=num).reshape(-1, 1), 
+            repeats=num_outcs, axis=-1)
 
     # Iterate over outcomes and thresholds
     for outc_id in range(num_outcs):
-        for thresh_id, eps in enumerate(thresholds[:, outc_id]):    
+        for thresh_id, eps in enumerate(thresholds[:,outc_id]):    
 
             # Convert scores to binary
             y_pred_thresh = (y_score >= eps).astype(int)
@@ -89,7 +90,7 @@ def _compute_bin_metrics(y_true: np.ndarray, y_score: np.ndarray, **kwargs) -> d
     multi-class true labels and predicted scores.
 
     Returns:
-    - Dict with corresponding scores, and list of thresholds. Scores are of shape (num_threshs, num_outcs)
+    - Dict with corresponding scores, and list of thresholds. shape (num_threshs, num_outcs)
     """
     threshs, tp, fn, fp, tn = _get_cm_values(y_true=y_true, y_score=y_score, **kwargs).values()
 
@@ -139,6 +140,7 @@ def custom_auc_auprc(y_true: np.ndarray, y_score: np.ndarray, mode: str = "custo
 
     return {"AUROC": auroc, "AUPRC": auprc}
 
+
 def plot_auc_auprc(y_true: np.ndarray, y_score: np.ndarray, mode: str = "custom", outc_names: list = None, **kwargs):
     """
     Make plots for Receiver-Operating-curves and Precision-Recall curves.
@@ -158,7 +160,7 @@ def plot_auc_auprc(y_true: np.ndarray, y_score: np.ndarray, mode: str = "custom"
         outc_names = list(range(1, 1 + num_outcs))
 
     # Load metrics
-    _, tpr, fpr, precision, recall = _compute_bin_metrics(y_true, y_score, mode=mode, **kwargs).values()
+    _, tpr, fpr, recall, precision = _compute_bin_metrics(y_true, y_score, mode=mode, **kwargs).values()
     auroc, auprc = custom_auc_auprc(y_true, y_score, mode=mode, **kwargs).values()
 
     # Initialise plots
@@ -166,8 +168,8 @@ def plot_auc_auprc(y_true: np.ndarray, y_score: np.ndarray, mode: str = "custom"
     outc_id = 0
 
     for outc_id, outc in enumerate(outc_names):
-        ax[0].plot(fpr[::-1], tpr[::-1], linestyle="--", color=colors[outc_id], label=f"{outc} - auroc {auroc[outc_id]:.3f}")
-        ax[1].plot(recall[::-1], precision[::-1], linestyle="--", color=colors[outc_id], label=f"{outc} - auprc {auprc[outc_id]:.3f}")
+        ax[0].plot(fpr[::-1, outc_id], tpr[::-1, outc_id], linestyle="--", color=colors[outc_id], label=f"{outc} - auroc {auroc[outc_id]:.3f}")
+        ax[1].plot(recall[::-1, outc_id], precision[::-1, outc_id], linestyle="--", color=colors[outc_id], label=f"{outc} - auprc {auprc[outc_id]:.3f}")
 
     # Add baseline 0.5 to AUROC plot
     baseline = np.linspace(0, 1, num=1000)
@@ -181,6 +183,8 @@ def plot_auc_auprc(y_true: np.ndarray, y_score: np.ndarray, mode: str = "custom"
 
     ax[0].set_title("ROC Curve")
     ax[1].set_title("PRC Curve")
+    ax[0].legend()
+    ax[1].legend()
 
     # Set suptitle and clearlayout
     fig.suptitle(f"{mode} Curves")

@@ -18,8 +18,7 @@ from sklearn.metrics import roc_auc_score, f1_score, recall_score, precision_sco
 from sklearn.metrics import RocCurveDisplay, PrecisionRecallDisplay
 from sklearn.metrics.cluster import contingency_matrix
 
-# List of ADMISSIBLE RESULTS SAVED KEYS
-ADMISSIBLE_RESULT_KEYS = ["y_pred", "outc_pred", "y_true", "pis_pred", "clus_pred", "clus_phenotypes"]
+import src.results.binary_prediction_utils as bin_utils
 
 
 def get_clus_outc_numbers(y_true: np.ndarray, clus_pred: np.ndarray):
@@ -43,32 +42,6 @@ def get_clus_outc_numbers(y_true: np.ndarray, clus_pred: np.ndarray):
     cont_matrix = contingency_matrix(labels_true, labels_pred)
 
     return cont_matrix
-
-
-def _get_outputs_dic(model_name: Union[List, None], run_num: Union[List, None]):
-    """
-    Get results dictionary given results_dictionary
-    """
-
-    # Save paths where data is saved.
-    save_fd = f"results/{model_name}/run{run_num}/"
-    output_dic = {}
-
-    # Load results given admissible keys
-    for key in ADMISSIBLE_RESULT_KEYS:
-
-        # Try to load object and save to dictionary
-        try:
-            load_obj = pd.read_csv(save_fd + key + ".csv", index_col=0, header=0)
-            output_dic[key] = load_obj
-
-            print(f"Object {key} successfully loaded.")
-
-        except FileNotFoundError:
-            print(f"Object {key} not loaded.")
-            pass
-
-    return output_dic
 
 
 def _convert_to_one_hot_from_probs(array_pred: Union[np.ndarray, pd.DataFrame]):
@@ -129,7 +102,7 @@ def purity(y_true: np.ndarray, clus_pred: np.ndarray) -> float:
     return purity_score
 
 
-def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
+def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None, outc_names=None):
     """
     Compute set of supervised classification scores between y_true and y_pred. List of metrics includes:
     a) AUROC, b) Recall, c) F1, d) Precision, e) Adjusted Rand Index and f) Normalised Mutual Information Score.
@@ -139,6 +112,7 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
     - y_pred: array-like of shape (N, num_outcs) of predicted outcome probability assignments.
     - avg: parameter for a), b), c) and d) computation indicating whether class scores should be averaged, and how.
     (default = None, all scores reported).
+    - outc_names: List or None, name of outcome dimensions.
 
     Returns:
         - Dictionary of performance scores:
@@ -149,83 +123,26 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
             - "ARI": Float value indicating Adjusted Rand Index performance.
             - "NMI": Float value indicating Normalised Mutual Information Score performance.
     """
+    num = 10000
+
     if isinstance(y_pred, pd.DataFrame):
         y_pred = y_pred.values
 
     if isinstance(y_true, pd.DataFrame):
         y_true = y_true.values
 
-    # Get PRC
-    prc, auc = np.zeros(shape=y_pred.shape[-1]), np.zeros(shape=y_pred.shape[-1])
-    for outc_id in range(y_pred.shape[-1]):
 
-        # Update prc and auc scores
-        auc[outc_id] = roc_auc_score(y_true=y_true[:, outc_id], y_score=y_pred[:, outc_id], average=avg)
-        prc[outc_id] = average_precision_score(y_true=y_true[:, outc_id], y_score=y_pred[:, outc_id], average=avg)
+    # Compute AUROC and AUPRC, both custom and standard
+    auroc, auprc = bin_utils.custom_auc_auprc(y_true, y_pred, mode="OvR", num=num).values()
+    auroc_custom, auprc_custom = bin_utils.custom_auc_auprc(y_true, y_pred, mode="custom", num=num).values()
 
     # GET ROC AND PRC CURVES
-    roc_prc_curves = {}
-    for outc_id in range(y_pred.shape[-1]):
-
-        # Add curve to map
-        fig, ax = plt.subplots(nrows=1, ncols=2)
-
-        RocCurveDisplay.from_predictions(y_true[:, outc_id], y_pred[:, outc_id], ax=ax[0])
-        PrecisionRecallDisplay.from_predictions(y_true[:, outc_id], y_pred[:, outc_id], ax=ax[1])
-
-        # Add info
-        ax[0].set_xlabel("FPR")
-        ax[0].set_ylabel("TPR")
-        ax[0].set_title(f"ROC Curve for outcome {outc_id}")
-
-        # Same for second ax
-        ax[1].set_xlabel("FPR")
-        ax[1].set_ylabel("TPR")
-        ax[1].set_title(f"PRC Curve for outcome {outc_id}")
-
-        # Add to curves
-        roc_prc_curves[f"Curves {outc_id}"] = fig, ax
-
-    # Get custom ROC and PRC Curves
-    _, tp, fn, fp, tn = _custom_cm_over_threshold(y_true=y_true, y_score=y_pred)
-    for outc_id in range(y_pred.shape[-1]):
-
-        # Get sensitivity, sensitivity precision and recall
-        tpr = tp / (tp + fn)
-        fpr = fp / (fp + tn)
-        precision = np.divide(tp ,tp + fp, out=np.zeros_like(tp), where=tp+fp==0)
-        recall = tp / (tp + fn)
-
-        # Initialise plots
-        fig, ax = plt.subplots(nrows=1, ncols=2)
-        baseline = np.linspace(0, 1, num=1000)
-
-        # Plot AUROC
-        ax[0].plot(fpr[::-1], tpr[::-1], linestyle="--", color="red", label="pred curve")
-        ax[0].plot(baseline, baseline, linestyle="-", color="blue", label="baseline")
-        
-        ax[0].set_xlabel("FPR")
-        ax[0].set_ylabel("TPR")
-        ax[0].set_title(f"Custom ROC Curve for outcome {outc_id}")
-        ax[0].legend()
-
-        # Plot PRC
-        ax[1].plot(recall[::-1], precision[::-1], linestyle="--", color="red", label="pred curve")
-        ax[1].plot(baseline, baseline, linestyle="-", color="blue", label="baseline")
-
-        ax[1].set_xlabel("Recall")
-        ax[1].set_ylabel("Precision")
-        ax[1].set_title(f"Custom PRC Curve for outcome {outc_id}")
-        ax[1].legend()
-
-        # Add to curves
-        roc_prc_curves[f"Custom Curves {outc_id}"] = fig, ax
-
-
-    # Compute custom AUROC and AUPRC
-    auc_common = custom_auc(y_true=y_true, y_score=y_pred)
-    prc_common = custom_prc(y_true=y_true, y_score=y_pred)
-
+    roc_prc_curves = {
+        "OvR": bin_utils.plot_auc_auprc(y_true, y_pred, mode="OvR", outc_names=outc_names, num=num),
+        "Custom": bin_utils.plot_auc_auprc(y_true, y_pred, mode="custom", outc_names=outc_names, num=num)
+    }
+    
+    
     # Convert input arrays to categorical labels
     labels_true, labels_pred = np.argmax(y_true, axis=1), np.argmax(y_pred, axis=1)
 
@@ -249,10 +166,10 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
 
     # Return Dictionary
     scores_dic = {
-        "ROC-AUC": auc,
-        "ROC-PRC": prc,
-        "ROC-AUC-custom": auc_common,
-        "ROC-PRC-custom": prc_common,
+        "ROC-AUC": auroc,
+        "ROC-PRC": auprc,
+        "ROC-AUC-custom": auroc_custom,
+        "ROC-PRC-custom": auprc_custom,
         "F1": f1,
         "Recall": rec,
         "Precision": prec,

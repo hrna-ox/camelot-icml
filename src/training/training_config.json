@@ -1,10 +1,11 @@
 {
-   "lr": 0.0005,
-   "epochs_init_1": 5,
-   "epochs_init_2": 5,
-   "epochs": 5,
-   "bs": 256,
-   "cbck_str": "auc-cm-clus_info",
-   "patience_epochs": 100,
+   "lr_init": 0.2,
+   "lr": 0.0001,
+   "epochs_init_1": 50,
+   "epochs_init_2": 50,
+   "epochs": 50,
+   "bs": 64,
+   "cbck_str": "auc-clus_info",
+   "patience_epochs": 200,
    "gpu": 0
 }

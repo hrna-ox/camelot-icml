@@ -63,7 +63,7 @@ def evaluate(y_true=None, y_pred=None, clus_pred=None, data_info=None, save_fd=N
         outc_names = data_properties["outc_names"]
 
         # Compute scores and confusion matrix
-        scores, cm, Roc_curves = utils.compute_supervised_scores(y_true, y_pred, avg=avg)
+        scores, cm, Roc_curves = utils.compute_supervised_scores(y_true, y_pred, avg=avg, outc_names=outc_names)
 
         # Convert Confusion Matrix to pdDataFrame
         cm = pd.DataFrame(cm, index=pd.Index(data=outc_names, name="True Class"),

@@ -695,13 +695,14 @@ class Model(CAMELOT):
 
         return None
 
-    def train(self, data_info, lr: float = 0.001, epochs_init_1: int = 100, epochs_init_2: int = 100, epochs: int = 100,
+    def train(self, data_info, lr_init: float = 0.001, lr: float = 0.001, epochs_init_1: int = 100, epochs_init_2: int = 100, epochs: int = 100,
               bs: int = 32, patience_epochs: int = 200, gpu: Union[str, None] = None, **kwargs):
         """
         Fit method for training CAMELOT model.
 
         Params:
         - data_info: dictionary with data information and parameters.
+        - lr_init": str, learning rate for initialisation training (default=0.001)
         - "lr": learning rate for training (default = 0.001)
         - "epochs_init": number of epochs to train initialisation (default = 100)
         - "epochs": number of epochs for main.py training (default = 100)
@@ -711,6 +712,7 @@ class Model(CAMELOT):
         parallelise. Otherwise, regular GPU training.
         """
         self.training_params.update({
+            "lr_init": lr_init,
             "lr": lr,
             "epochs_init_1": epochs_init_1,
             "epochs_init_2": epochs_init_2,
@@ -730,7 +732,7 @@ class Model(CAMELOT):
 
         print("-" * 20, "\n", "Initialising Model", sep="\n")
         self.initialise_model(data=train_data, val_data=val_data, epochs_1=epochs_init_1, epochs_2 = epochs_init_2,
-                              learning_rate=lr, batch_size=bs, patience_epochs=patience_epochs, training_rate=lr)
+                              learning_rate=lr_init, batch_size=bs, patience_epochs=patience_epochs, training_rate=lr)
 
         # Main Training phase
         print("-" * 20, "\n", "STARTING MAIN TRAINING PHASE")
@@ -744,7 +746,7 @@ class Model(CAMELOT):
 
         # Fit model
         history = self.fit(train_data, validation_data=val_data, epochs=epochs,
-                           verbose=2) # , callbacks=self.callback_lst)
+                           verbose=2, callbacks=self.callback_lst)
 
         return history
 
