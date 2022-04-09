@@ -50,9 +50,6 @@ def evaluate(y_true=None, y_pred=None, clus_pred=None, data_info=None, save_fd=N
         cm = None
         clus_metrics = {}
 
-    elif "tskm" in save_fd.lower():
-        return None
-
     else:
 
         if isinstance(y_pred, pd.DataFrame):
@@ -94,11 +91,11 @@ def evaluate(y_true=None, y_pred=None, clus_pred=None, data_info=None, save_fd=N
     scores = {**scores, **clus_metrics}
 
     # Save
-    for key, value in Roc_curves.items():
+    # for key, value in Roc_curves.items():
     
-        # Get fig, ax and save
-        fig, _ = value
-        fig.savefig(save_fd + key)
+    #     # Get fig, ax and save
+    #     fig, _ = value
+    #     fig.savefig(save_fd + key)
 
 
     with open(save_fd + "scores.csv", "w+", newline="\n") as f:

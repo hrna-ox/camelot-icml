@@ -132,16 +132,16 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None, 
         y_true = y_true.values
 
 
-    # Compute AUROC and AUPRC, both custom and standard
-    auroc, auprc = bin_utils.custom_auc_auprc(y_true, y_pred, mode="OvR", num=num).values()
-    auroc_custom, auprc_custom = bin_utils.custom_auc_auprc(y_true, y_pred, mode="custom", num=num).values()
+    # # Compute AUROC and AUPRC, both custom and standard
+    # auroc, auprc = bin_utils.custom_auc_auprc(y_true, y_pred, mode="OvR", num=num).values()
+    # auroc_custom, auprc_custom = bin_utils.custom_auc_auprc(y_true, y_pred, mode="custom", num=num).values()
 
-    # GET ROC AND PRC CURVES
-    roc_prc_curves = {
-        "OvR": bin_utils.plot_auc_auprc(y_true, y_pred, mode="OvR", outc_names=outc_names, num=num),
-        "Custom": bin_utils.plot_auc_auprc(y_true, y_pred, mode="custom", outc_names=outc_names, num=num)
-    }
-    
+    # # GET ROC AND PRC CURVES
+    # roc_prc_curves = {
+    #     "OvR": bin_utils.plot_auc_auprc(y_true, y_pred, mode="OvR", outc_names=outc_names, num=num),
+    #     "Custom": bin_utils.plot_auc_auprc(y_true, y_pred, mode="custom", outc_names=outc_names, num=num)
+    # }
+    auroc = roc_auc_score(y_true, y_pred, average=None)
     
     # Convert input arrays to categorical labels
     labels_true, labels_pred = np.argmax(y_true, axis=1), np.argmax(y_pred, axis=1)
@@ -167,9 +167,9 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None, 
     # Return Dictionary
     scores_dic = {
         "ROC-AUC": auroc,
-        "ROC-PRC": auprc,
-        "ROC-AUC-custom": auroc_custom,
-        "ROC-PRC-custom": auprc_custom,
+        # "ROC-PRC": auprc,
+        # # "ROC-AUC-custom": auroc_custom,
+        # # "ROC-PRC-custom": auprc_custom,
         "F1": f1,
         "Recall": rec,
         "Precision": prec,
@@ -177,7 +177,8 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None, 
         "NMI": nmi
     }
 
-    return scores_dic, cm, roc_prc_curves
+    # return scores_dic, cm, roc_prc_curves
+    return scores_dic, cm, None
 
 
 def compute_from_eas_scores(y_true: np.ndarray, scores: np.ndarray, outc_names: np.ndarray = None, **kwargs) -> dict:

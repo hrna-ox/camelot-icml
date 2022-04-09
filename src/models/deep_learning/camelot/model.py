@@ -18,7 +18,7 @@ import json
 from typing import Union
 
 import src.models.deep_learning.camelot.model_utils as model_utils
-from src.models.deep_learning.model_blocks import MLP, AttentionRNNEncoder
+from src.models.deep_learning.model_blocks import MLP, AttentionRNNEncoder, LSTMEncoder
 
 
 class CAMELOT(tf.keras.Model):
@@ -97,6 +97,9 @@ class CAMELOT(tf.keras.Model):
         self.Encoder = AttentionRNNEncoder(units=self.latent_dim, dropout=self.dropout,
                                            regulariser_params=self.regulariser, name="Encoder",
                                            **self.encoder_params)
+        # self.Encoder = LSTMEncoder(latent_dim=self.latent_dim, dropout=self.dropout,
+        #                             regulariser_params=self.regulariser, name="Encoder",
+        #                             **self.encoder_params)
         self.Identifier = MLP(output_dim=self.K, dropout=self.dropout, output_fn="softmax",
                               regulariser_params=self.regulariser, seed=self.seed, name="Identifier",
                               **self.identifier_params)
@@ -795,7 +798,7 @@ class Model(CAMELOT):
         # Other useful definitions
         K = self.K
         cluster_names = list(range(1, K + 1))
-        output_test = self.predict(X_test)
+        output_test = self.Predictor(self.Encoder(X_test)).numpy()
 
         # Firstly, compute predicted y estimates
         y_pred = pd.DataFrame(output_test, index=pat_ids, columns=outc_dims)
@@ -816,8 +819,8 @@ class Model(CAMELOT):
         init_loss_1.index.name, init_loss_2.index.name = "epoch", "epoch"
 
         # Fifth, compute attention scores
-        alpha, beta, gamma = self.compute_unnorm_attention_weights(X_test)
-        alpha_norm, beta_norm, gamma_norm = self.compute_norm_attention_weights(X_test)
+        # alpha, beta, gamma = self.compute_unnorm_attention_weights(X_test)
+        # alpha_norm, beta_norm, gamma_norm = self.compute_norm_attention_weights(X_test)
 
         # Sixth, get configuration
         all_model_config = self.get_config()
@@ -836,9 +839,9 @@ class Model(CAMELOT):
         init_loss_1.to_csv(save_fd + "enc_pred_init_loss.csv", index=True, header=True)
         init_loss_2.to_csv(save_fd + "iden_init_loss.csv", index=True, header=True)
 
-        # Save attention weights
-        np.savez(save_fd + "unnorm_weights", alpha=alpha, beta=beta, gamma=gamma)
-        np.savez(save_fd + "norm_weights", alpha=alpha_norm, beta=beta_norm, gamma=gamma_norm)
+        # # Save attention weights
+        # np.savez(save_fd + "unnorm_weights", alpha=alpha, beta=beta, gamma=gamma)
+        # np.savez(save_fd + "norm_weights", alpha=alpha_norm, beta=beta_norm, gamma=gamma_norm)
 
         # save model parameters
         save_params = {**data_info["data_load_config"], **self.model_config, **self.training_params}
@@ -858,8 +861,9 @@ class Model(CAMELOT):
         outputs_dic = {
             "y_pred": y_pred, "class_pred": outc_pred, "y_true": y_true, "pis_pred": pis_pred, "clus_pred": clus_pred,
             "clus_representations": cluster_rep_set, "clus_phenotypes": clus_phenotypes,
-            "init_loss_enc_pred": init_loss_1, "init_loss_iden": init_loss_2, "attention_unnorm": (alpha, beta, gamma),
-            "attention_norm": (alpha_norm, beta_norm, gamma_norm), "logs": track_fd + "logs",
+            "init_loss_enc_pred": init_loss_1, "init_loss_iden": init_loss_2, #"attention_unnorm": (alpha, beta, gamma),
+            #"attention_norm": (alpha_norm, beta_norm, gamma_norm),
+            "logs": track_fd + "logs",
             "save_fd": save_fd, "model_config": self.model_config
         }
 

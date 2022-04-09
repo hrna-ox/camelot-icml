@@ -242,9 +242,8 @@ class ACTPC(tf.keras.Model):
 
             # compute losses
             l_crit = model_utils.l_crit(y, y_pred)
-            l_dist = model_utils.l_dist(pi)
-            l_entr = model_utils.l_entr(pi)
-            l_clus = model_utils.l_clus(clus_phens)
+            l_dist = model_utils.l_prob(pi)
+            l_clus = model_utils.l_phens(clus_phens)
 
             # Aggreggate Loss
             loss = l_crit + self.alpha * l_dist + self.beta * l_clus
@@ -321,9 +320,8 @@ class ACTPC(tf.keras.Model):
 
         # compute losses
         l_crit = model_utils.l_crit(y, y_pred)
-        l_dist = model_utils.l_dist(pi)
-        l_entr = model_utils.l_entr(pi)
-        l_clus = model_utils.l_clus(clus_phens)
+        l_dist = model_utils.l_prob(pi)
+        l_clus = model_utils.l_phens(clus_phens)
         loss = l_crit + self.alpha * l_dist + self.beta * l_clus
 
         return {"Loss": loss, "l_crit": l_crit, "L_clus_id": l_dist, "L_clus_sep": l_clus}
@@ -347,9 +345,8 @@ class ACTPC(tf.keras.Model):
 
         # compute losses
         l_crit = model_utils.l_crit(y, y_pred)
-        l_dist = model_utils.l_dist(pi)
-        l_entr = model_utils.l_entr(pi)
-        l_clus = model_utils.l_clus(clus_phens)
+        l_dist = model_utils.l_prob(pi)
+        l_clus = model_utils.l_phens(clus_phens)
         loss = l_crit + self.alpha * l_dist + self.beta * l_clus
 
         return {"Loss": loss, "l_crit": l_crit, "L_clus_id": l_dist, "L_clus_sep": l_clus}
@@ -577,7 +574,7 @@ class ACTPC(tf.keras.Model):
 
                 # Forward pass
                 clus_val_pred = self.Selector(self.Actor(x_batch))
-                loss_val_batch = model_utils.l_crit(clus_val_y, clus_val_pred)
+                loss_val_batch = model_utils.l_crit(clus_batch, clus_val_pred)
 
                 # Update loss
                 val_loss += loss_val_batch
