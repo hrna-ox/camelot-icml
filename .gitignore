@@ -1,3 +1,14 @@
+# Remove folders
+**/data/**/*
+data/**/*
+models/**/*
+visualisations/**/*
+experiments/**/*
+results/**/*
+src/training/*_config.json
+.idea/**/*
+
+>>>>>>> origin/adding-other-dl-benchmarks
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -1,2 +1,20 @@
+<<<<<<< HEAD
 numpy>=
 tensorflow>=2.2.0
+=======
+
+numpy>=1.14
+tensorflow>=2.4
+pandas>=1.3.0
+scikit-learn>=0.9.0
+
+tensorflow-gpu~=2.6.0
+scipy~=1.7.3
+tqdm~=4.62.3
+scikit-learn~=1.0.2
+seaborn~=0.11.2
+matplotlib~=3.5.0
+sacred~=0.8.2
+xgboost~=1.5.0
+tslearn~=0.5.2
+>>>>>>> f20dbf2da4367bd8fa9ed340bcb95643c29d8980
