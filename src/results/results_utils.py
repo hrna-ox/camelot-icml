@@ -8,16 +8,17 @@ Created on Sun Nov 21 10:48:57 2021
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from typing import Union, List
 
 from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
 from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score, confusion_matrix
-from sklearn.metrics import roc_auc_score, f1_score, recall_score, precision_score
+from sklearn.metrics import roc_auc_score, f1_score, recall_score, precision_score, average_precision_score
+from sklearn.metrics import RocCurveDisplay, PrecisionRecallDisplay
 from sklearn.metrics.cluster import contingency_matrix
 
-# List of ADMISSIBLE RESULTS SAVED KEYS
-ADMISSIBLE_RESULT_KEYS = ["y_pred", "outc_pred", "y_true", "pis_pred", "clus_pred", "clus_phenotypes"]
+import src.results.binary_prediction_utils as bin_utils
 
 
 def get_clus_outc_numbers(y_true: np.ndarray, clus_pred: np.ndarray):
@@ -41,32 +42,6 @@ def get_clus_outc_numbers(y_true: np.ndarray, clus_pred: np.ndarray):
     cont_matrix = contingency_matrix(labels_true, labels_pred)
 
     return cont_matrix
-
-
-def _get_outputs_dic(model_name: Union[List, None], run_num: Union[List, None]):
-    """
-    Get results dictionary given results_dictionary
-    """
-
-    # Save paths where data is saved.
-    save_fd = f"results/{model_name}/run{run_num}/"
-    output_dic = {}
-
-    # Load results given admissible keys
-    for key in ADMISSIBLE_RESULT_KEYS:
-
-        # Try to load object and save to dictionary
-        try:
-            load_obj = pd.read_csv(save_fd + key + ".csv", index_col=0, header=0)
-            output_dic[key] = load_obj
-
-            print(f"Object {key} successfully loaded.")
-
-        except FileNotFoundError:
-            print(f"Object {key} not loaded.")
-            pass
-
-    return output_dic
 
 
 def _convert_to_one_hot_from_probs(array_pred: Union[np.ndarray, pd.DataFrame]):
@@ -127,7 +102,7 @@ def purity(y_true: np.ndarray, clus_pred: np.ndarray) -> float:
     return purity_score
 
 
-def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
+def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None, outc_names=None):
     """
     Compute set of supervised classification scores between y_true and y_pred. List of metrics includes:
     a) AUROC, b) Recall, c) F1, d) Precision, e) Adjusted Rand Index and f) Normalised Mutual Information Score.
@@ -137,6 +112,7 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
     - y_pred: array-like of shape (N, num_outcs) of predicted outcome probability assignments.
     - avg: parameter for a), b), c) and d) computation indicating whether class scores should be averaged, and how.
     (default = None, all scores reported).
+    - outc_names: List or None, name of outcome dimensions.
 
     Returns:
         - Dictionary of performance scores:
@@ -147,10 +123,26 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
             - "ARI": Float value indicating Adjusted Rand Index performance.
             - "NMI": Float value indicating Normalised Mutual Information Score performance.
     """
+    num = 10000
 
-    # Compute ROC-AUC first given y_pred and y_true format
-    auc = roc_auc_score(y_true, y_pred, average=avg, multi_class="ovr")
+    if isinstance(y_pred, pd.DataFrame):
+        y_pred = y_pred.values
 
+    if isinstance(y_true, pd.DataFrame):
+        y_true = y_true.values
+
+
+    # # Compute AUROC and AUPRC, both custom and standard
+    # auroc, auprc = bin_utils.custom_auc_auprc(y_true, y_pred, mode="OvR", num=num).values()
+    # auroc_custom, auprc_custom = bin_utils.custom_auc_auprc(y_true, y_pred, mode="custom", num=num).values()
+
+    # # GET ROC AND PRC CURVES
+    # roc_prc_curves = {
+    #     "OvR": bin_utils.plot_auc_auprc(y_true, y_pred, mode="OvR", outc_names=outc_names, num=num),
+    #     "Custom": bin_utils.plot_auc_auprc(y_true, y_pred, mode="custom", outc_names=outc_names, num=num)
+    # }
+    auroc = roc_auc_score(y_true, y_pred, average=None)
+    
     # Convert input arrays to categorical labels
     labels_true, labels_pred = np.argmax(y_true, axis=1), np.argmax(y_pred, axis=1)
 
@@ -174,7 +166,10 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
 
     # Return Dictionary
     scores_dic = {
-        "ROC-AUC": auc,
+        "ROC-AUC": auroc,
+        # "ROC-PRC": auprc,
+        # # "ROC-AUC-custom": auroc_custom,
+        # # "ROC-PRC-custom": auprc_custom,
         "F1": f1,
         "Recall": rec,
         "Precision": prec,
@@ -182,12 +177,14 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
         "NMI": nmi
     }
 
-    return scores_dic, cm
+    # return scores_dic, cm, roc_prc_curves
+    return scores_dic, cm, None
 
 
 def compute_from_eas_scores(y_true: np.ndarray, scores: np.ndarray, outc_names: np.ndarray = None, **kwargs) -> dict:
     """
     Compute supervised performance metrics given input array scores.
+
 
     Params:
     - y_true: array-like of shape (N, num_outcs).
@@ -199,7 +196,7 @@ def compute_from_eas_scores(y_true: np.ndarray, scores: np.ndarray, outc_names: 
     - dict with scores ROC-AUC, F1, Recall, Precision per class
     """
 
-    # Useful infos
+    # Useful info
     num_outcs = y_true.shape[-1]
 
     if outc_names is None:

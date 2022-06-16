@@ -23,7 +23,7 @@ MIMIC_PARSE_TIME_VARS = ["intime", "outtime", "chartmax"]
 MIMIC_PARSE_TD_VARS = ["sampled_time_to_end(1H)", "time_to_end", "time_to_end_min", "time_to_end_max"]
 MIMIC_VITALS = ["TEMP", "HR", "RR", "SPO2", "SBP", "DBP"]
 MIMIC_STATIC = ["age", "gender", "ESI"]
-MIMIC_OUTCOME_NAMES = ["De+I", "W", "Di"]
+MIMIC_OUTCOME_NAMES = ["De" ,"I", "W", "Di"]
 
 MAIN_ID_LIST = ["subject_id", "hadm_id", "stay_id", "patient_id", "pat_id"]  # Identifiers for main ids.
 

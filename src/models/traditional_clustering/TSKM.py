@@ -17,7 +17,7 @@ class TSKM(TimeSeriesKMeans):
     Model Class Wrapper for a KMeans clustering model.
     """
 
-    def __init__(self, data_info: dict = {}, metric="euclidean", verbose=1, **kwargs):
+    def __init__(self, data_info: dict = {}, verbose=1, **kwargs):
         """
         Initialise object with model configuration.
 
@@ -153,7 +153,7 @@ class TSKM(TimeSeriesKMeans):
 
         # Return objects
         outputs_dic = {
-            "y_pred": y_pred, "outc_pred": outc_pred,
+            "y_pred": y_pred, "outc_pred": outc_pred, "y_true": y_test, 
             "pis_pred": pis_pred, "clus_pred": clus_pred, "save_fd": save_fd, "model_config": self.model_config
         }
 

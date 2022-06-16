@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
 import seaborn as sns
 
-import json, os
+import json
+import os
 from typing import Union, List, Tuple
 
 from src.data_processing.data_loading_utils import _is_temporal_feat, _is_id_feat, _is_static_feat
@@ -45,8 +46,8 @@ def plot_attention(alpha, beta, gamma, clus_pred=None, feats=None):
     nrows, ncols = _nrows_ncols(K)
 
     # Initialise plots 1 and 2
-    fig1, ax1 = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=True)
-    fig2, ax2 = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=True)
+    fig1, ax1 = plt.subplots(nrows=nrows, ncols=ncols, sharex="all", sharey="all")
+    fig2, ax2 = plt.subplots(nrows=nrows, ncols=ncols, sharex="all", sharey="all")
 
     # Reshape axis
     axes1 = ax1.reshape(-1)
@@ -182,7 +183,7 @@ def plot_loss_fn(train_values: List, val_values: List):
     - val_values: list object with loss values on validation data.
 
     Returns:
-    - Tuple (Fig, ax) of figure, plt.ax objects with corresponding plot of loss_values.
+    - Tuple (Fig, ax) of figure, ax objects with corresponding plot of loss_values.
     """
     # Compute Length of list
     N = len(train_values)
@@ -232,7 +233,7 @@ def make_group_summaries(input_data: pd.DataFrame, groups_df: pd.DataFrame, id_c
 
     # Make temporal plots
     nrows, ncols = _nrows_ncols(len(time_vars))
-    fig, ax = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=False)
+    fig, ax = plt.subplots(nrows=nrows, ncols=ncols, sharex="all", sharey="all")
     ax = _make_temporal_trajs(group_data_dic, time_vars, id_col, time_col, ax=ax)
 
     return summary_info, (fig, ax)
@@ -345,6 +346,7 @@ def _make_summary_statistics(group_data_dic: Union[pd.DataFrame, dict], feats: U
         for group_id, (group, group_data) in enumerate(group_data_dic.items()):
 
             # Compute feature summary values - if static, take only first value, if temporal (or any other) take all.
+            feat_dist = None
             if _is_static_feat(feat):
                 feat_dist = group_data.groupby(id_col).apply(lambda x: x[feat].iloc[0]).values
 
@@ -521,7 +523,7 @@ def get_dists_per_clus(pis_pred):
 
     # Initialise plot
     nrows, ncols = _nrows_ncols(N)
-    fig, ax = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=True)
+    fig, ax = plt.subplots(nrows=nrows, ncols=ncols, sharex="all", sharey="all")
     axes = ax.reshape(-1)
 
     # Iterate through each cluster

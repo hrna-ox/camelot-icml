@@ -331,7 +331,7 @@ class Model(EncPred):
 
         # Fit model
         history = self.fit(train_data, validation_data=val_data, epochs=epochs,
-                           verbose=2, callbacks=self.callback_lst)
+                           verbose=2)
 
         return history
 

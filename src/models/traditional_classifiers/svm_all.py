@@ -74,8 +74,9 @@ class SVMAll(SVC):
 
         # Get shape and flatten array
         N_test, T, D_f = X_train.shape
-        X = X_train.reshape(N_test, -1)
-        y = np.argmax(y_train, axis=1)
+        X = X_train.reshape(-1, X_train.shape[-1])
+        y_per_feat = np.repeat(y_train.reshape(-1, 1, 4), repeats=T, axis=1)
+        y = np.argmax(y_per_feat, axis=-1).reshape(-1)
 
         # Fit model
         self.fit(X, y, sample_weight=None)
@@ -119,8 +120,9 @@ class SVMAll(SVC):
 
         # Make prediction on test data
         if self.model_config["probability"] is True:
-            X_test = X_test.reshape(X_test.shape[0], -1)
-            output_test = self.predict_proba(X_test)
+            X_test = X_test.reshape(-1, X_test.shape[-1])
+            output_test = self.predict_proba(X_test).reshape(pat_ids.size, -1, 4)
+            output_test = np.mean(output_test, axis=1)
 
         else:
             # Predict gives categorical vector, and we one-hot encode output.

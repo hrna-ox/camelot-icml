@@ -73,8 +73,9 @@ class XGBAll:
         y_train = np.concatenate((y_train, y_val), axis=0)
 
         # Flatten time and D_f dimensions
-        X = X_train.reshape(X_train.shape[0], -1)
-        y = np.argmax(y_train, axis=1)
+        X = X_train.reshape(-1, X_train.shape[-1])
+        y_per_feat = np.repeat(y_train.reshape(-1, 1, 4), repeats=X_train.shape[1], axis=1)
+        y = np.argmax(y_per_feat, axis=-1).reshape(-1)
 
         self.model.fit(X, y)
 
@@ -116,8 +117,9 @@ class XGBAll:
             os.makedirs(save_fd)
 
         # Flatten and make probability
-        X_test = X_test.reshape(pat_ids.size, -1)
-        output_test = self.model.predict_proba(X_test)
+        X_test = X_test.reshape(-1, X_test.shape[-1])
+        output_test = self.model.predict_proba(X_test).reshape(pat_ids.size, -1, 4)
+        output_test = np.mean(output_test, axis=1)
 
         # First, compute predicted y estimates
         y_pred = pd.DataFrame(output_test, index=pat_ids, columns=outc_dims)

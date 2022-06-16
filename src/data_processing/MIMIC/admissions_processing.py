@@ -149,7 +149,7 @@ def main():
     # Compute and remove ESI NAN, ESI 1 and ESI 5 and save
     admissions_ed_S4["ESI"] = triage_ed.set_index("stay_id").loc[admissions_ed_S4.stay_id.values, "acuity"].values
     admissions_ed_S5 = admissions_ed_S4[~ admissions_ed_S4["ESI"].isna()]
-    admissions_ed_S5 = admissions_ed_S5[~ admissions_ed_S5["ESI"].isin([1, 5])]
+    # admissions_ed_S5 = admissions_ed_S5[~ admissions_ed_S5["ESI"].isin([1, 5])]
 
     # Save data
     admissions_ed_S5.to_csv(SAVE_FD + "admissions_intermediate.csv", index=True, header=True)

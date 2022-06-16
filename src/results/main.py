@@ -50,9 +50,6 @@ def evaluate(y_true=None, y_pred=None, clus_pred=None, data_info=None, save_fd=N
         cm = None
         clus_metrics = {}
 
-    elif "tskm" in save_fd.lower():
-        return None
-
     else:
 
         if isinstance(y_pred, pd.DataFrame):
@@ -63,7 +60,7 @@ def evaluate(y_true=None, y_pred=None, clus_pred=None, data_info=None, save_fd=N
         outc_names = data_properties["outc_names"]
 
         # Compute scores and confusion matrix
-        scores, cm = utils.compute_supervised_scores(y_true, y_pred, avg=avg)
+        scores, cm, Roc_curves = utils.compute_supervised_scores(y_true, y_pred, avg=avg, outc_names=outc_names)
 
         # Convert Confusion Matrix to pdDataFrame
         cm = pd.DataFrame(cm, index=pd.Index(data=outc_names, name="True Class"),
@@ -94,6 +91,13 @@ def evaluate(y_true=None, y_pred=None, clus_pred=None, data_info=None, save_fd=N
     scores = {**scores, **clus_metrics}
 
     # Save
+    # for key, value in Roc_curves.items():
+    
+    #     # Get fig, ax and save
+    #     fig, _ = value
+    #     fig.savefig(save_fd + key)
+
+
     with open(save_fd + "scores.csv", "w+", newline="\n") as f:
         csv_writer = writer(f, delimiter=",")
 

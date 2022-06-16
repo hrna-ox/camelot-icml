@@ -5,11 +5,14 @@ import datetime as dt
 import os
 
 import pandas as pd
+from tqdm import tqdm
 
 import src.data_processing.MIMIC.data_utils as utils
 import src.data_processing.MIMIC.test as test
 from src.data_processing.MIMIC.admissions_processing import SAVE_FD, DATA_FD
 from src.data_processing.MIMIC.vitals_processing import resampling_rule
+
+tqdm.pandas()
 
 """
 
@@ -91,17 +94,17 @@ def main():
     time_window_6 = dt.timedelta(hours=48)
 
     # Need to include Death
-    outcomes_4_hours = transfers_subset.groupby("hadm_id", as_index=True).apply(
+    outcomes_4_hours = transfers_subset.groupby("hadm_id", as_index=True).progress_apply(
         lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_1))
-    outcomes_12_hours = transfers_subset.groupby("hadm_id", as_index=True).apply(
+    outcomes_12_hours = transfers_subset.groupby("hadm_id", as_index=True).progress_apply(
         lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_2))
-    outcomes_18_hours = transfers_subset.groupby("hadm_id", as_index=True).apply(
+    outcomes_18_hours = transfers_subset.groupby("hadm_id", as_index=True).progress_apply(
         lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_3))
-    outcomes_24_hours = transfers_subset.groupby("hadm_id", as_index=True).apply(
+    outcomes_24_hours = transfers_subset.groupby("hadm_id", as_index=True).progress_apply(
         lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_4))
-    outcomes_36_hours = transfers_subset.groupby("hadm_id", as_index=True).apply(
+    outcomes_36_hours = transfers_subset.groupby("hadm_id", as_index=True).progress_apply(
         lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_5))
-    outcomes_48_hours = transfers_subset.groupby("hadm_id", as_index=True).apply(
+    outcomes_48_hours = transfers_subset.groupby("hadm_id", as_index=True).progress_apply(
         lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_6))
 
     # Ensure all patients have only one class
@@ -137,6 +140,8 @@ def main():
     # Number of Patients and number of observations.
     print(f"Number of cohort patient: {vitals_final.stay_id.nunique()}")
     print(f"Number of observations: {vitals_final.shape[0]}")
+
+    print(f"Sample outcome distribution: {outcomes_4_hours.sum(axis=0)}")
 
     # Save to output variables
     process_fd = DATA_FD + "processed/"
