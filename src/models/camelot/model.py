@@ -796,9 +796,5 @@ class Model:
         #     new_row = [time.time(), run_num] + list(param_values) + [auc, f1, rec, pur, sil, sil_avg, dbi, dbi_avg, vri, vri_avg]
         #     writer.writerow(new_row)
 
-        #     f.close()
-
-        # np.savez("data/ICLR-submitted/test_data.npz",
-        #          X_test=X_test, y_test=y_test, id_test=id_test,
-        #          mask_test=mask_test, feats=data_info["feats"])
+        #     f.close(
 
