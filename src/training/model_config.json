@@ -3,11 +3,11 @@
    "num_clusters": 10,
    "latent_dim": 64,
    "seed": 1111,
-   "name": "ABL1",
-   "alpha_1": 0.0,
-   "alpha_2": 0.1,
-   "alpha_3": 0.0,
-   "beta": 0.1,
+   "name": "CAMELOT",
+   "alpha_1": 0.1,
+   "alpha_2": 0.0,
+   "alpha_3": 0.1,
+   "beta": 0.2,
    "regulariser_params": [
       0.01,
       0.01
