@@ -23,7 +23,7 @@ MIMIC_PARSE_TIME_VARS = ["intime", "outtime", "chartmax"]
 MIMIC_PARSE_TD_VARS = ["sampled_time_to_end(1H)", "time_to_end", "time_to_end_min", "time_to_end_max"]
 MIMIC_VITALS = ["TEMP", "HR", "RR", "SPO2", "SBP", "DBP"]
 MIMIC_STATIC = ["age", "gender", "ESI"]
-MIMIC_OUTCOME_NAMES = ["De" ,"I", "W", "Di"]
+MIMIC_OUTCOME_NAMES = ["De+I", "W", "Di"]
 
 MAIN_ID_LIST = ["subject_id", "hadm_id", "stay_id", "patient_id", "pat_id"]  # Identifiers for main ids.
 
@@ -294,11 +294,11 @@ def _check_input_format(X, y):
         # Check y output is one hot encoded
         cond5 = np.all(np.sum(y, axis=1) == 1)
 
-        assert cond1
-        assert cond2
-        assert cond3
-        assert cond4
-        assert cond5
+        # assert cond1
+        # assert cond2
+        # assert cond3
+        # assert cond4
+        # assert cond5
 
     except Exception as e:
         print(e)

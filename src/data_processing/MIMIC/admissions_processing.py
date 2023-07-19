@@ -153,3 +153,6 @@ def main():
 
     # Save data
     admissions_ed_S5.to_csv(SAVE_FD + "admissions_intermediate.csv", index=True, header=True)
+
+if __name__ == "__main__":
+    main()

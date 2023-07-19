@@ -133,3 +133,5 @@ def main():
 	vitals_S5 = vitals_S5[vitals_S5["time_to_end_min"].dt.total_seconds() <= admission_min_time_to_outtime * 3600]
 	vitals_S5.to_csv(SAVE_FD + "vitals_intermediate.csv", index=True, header=True)
 
+if __name__ == "__main__":
+	main()
