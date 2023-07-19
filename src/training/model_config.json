@@ -4,30 +4,25 @@
    "latent_dim": 64,
    "seed": 2323,
    "name": "CAMELOT",
-   "alpha_1": 0.01,
+   "alpha_1": 0.1,
    "alpha_2": 0.01,
-   "alpha_3": 1,
+   "alpha_3": 0.1,
    "beta": 1,
    "regulariser_params": [
-      0.01,
-      0.01
+      0.5,
+      0.5
    ],
-   "dropout": 0.0,
+   "dropout": 0.5,
    "encoder_params": {
-      "hidden_layers": 1,
-      "hidden_nodes": 20
+      "hidden_layers": 2,
+      "hidden_nodes": 50
    },
    "identifier_params": {
-      "hidden_layers": 1,
-      "hidden_nodes": 30
+      "hidden_layers": 2,
+      "hidden_nodes": 50
    },
    "predictor_params": {
-      "hidden_layers": 1,
-      "hidden_nodes": 30
-   },
-   "C": 0.1,
-   "probability": true,
-   "n_estimators": 200,
-   "objective": "softmax",
-   "n_clusters": 8
+      "hidden_layers": 2,
+      "hidden_nodes": 50
+   }
 }

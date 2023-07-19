@@ -273,6 +273,7 @@ def select_death_icu_acute(df, admissions_df, timedt):
 
     Returns categorical encoding of the corresponding admission.
     Else returns 0,0,0,0 if a mistake is found.
+    Includes time to death after admission outtime, in hours, wherever exists, else np.nan.
     """
     # Check admission contains only one such row
     assert admissions_df.hadm_id.eq(df.name).sum() <= 1
@@ -284,8 +285,8 @@ def select_death_icu_acute(df, admissions_df, timedt):
     # First check if death exists
     hadm_information = admissions_df.query("hadm_id==@df.name")
     if not hadm_information.empty and not hadm_information.dod.isna().all():
-        time_of_death = hadm_information.dod.min()
-        time_from_start_point = (time_of_death - window_start_point)
+        time_death = hadm_information.dod.min() + dt.timedelta(hours=23, minutes=59, seconds=59)
+        time_from_start_point = (time_death - window_start_point)
 
         # try:
         #     assert time_from_vitals >= dt.timedelta(seconds=0)
@@ -295,7 +296,8 @@ def select_death_icu_acute(df, admissions_df, timedt):
 
         # Check death within time window
         if time_from_start_point < timedt:
-            return pd.Series(data=[1, 0, 0, 0, time_of_death], index=["De", "I", "W", "Di", "time"])
+            return pd.Series(data=[1, 0, 0, 0, time_from_start_point.total_seconds() / 3600],
+                             index=["De", "I", "W", "Di", "time"])
 
     # Otherwise, consider other transfers
     transfers_within_window = df[df["intime"].between(window_start_point, window_start_point + timedt)]
@@ -307,16 +309,16 @@ def select_death_icu_acute(df, admissions_df, timedt):
 
     if has_icus.sum() > 0:
         icu_transfers = transfers_within_window[has_icus]
-        return pd.Series(data=[0, 1, 0, 0, icu_transfers.intime.min()],
+        return pd.Series(data=[0, 1, 0, 0, np.nan],
                          index=["De", "I", "W", "Di", "time"])
 
     # Check to see if discharge has taken
     discharges = transfers_within_window.eventtype.str.contains("discharge", na=False)
     if discharges.sum() > 0:
-        return pd.Series(data=[0, 0, 0, 1, transfers_within_window[discharges].intime.min()],
+        return pd.Series(data=[0, 0, 0, 1, np.nan],
                          index=["De", "I", "W", "Di", "time"]
                          )
     else:
-        return pd.Series(data=[0, 0, 1, 0, transfers_within_window.intime.min()],
+        return pd.Series(data=[0, 0, 1, 0, np.nan],
                          index=["De", "I", "W", "Di", "time"]
                          )

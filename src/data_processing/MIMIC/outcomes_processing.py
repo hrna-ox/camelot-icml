@@ -94,26 +94,26 @@ def main():
     time_window_6 = dt.timedelta(hours=48)
 
     # # Need to include Death
-    # outcomes_4_hours = transfers_subset.groupby("hadm_id", as_index=True).progress_apply(
-    #     lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_1))
+    outcomes_4_hours = transfers_subset.groupby("hadm_id", as_index=True).progress_apply(
+        lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_1))
     outcomes_12_hours = transfers_subset.groupby("hadm_id", as_index=True).progress_apply(
         lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_2))
-    # outcomes_18_hours = transfers_subset.groupby("hadm_id", as_index=True).progress_apply(
-    #     lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_3))
-    # outcomes_24_hours = transfers_subset.groupby("hadm_id", as_index=True).progress_apply(
-    #     lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_4))
-    # outcomes_36_hours = transfers_subset.groupby("hadm_id", as_index=True).progress_apply(
-    #     lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_5))
-    # outcomes_48_hours = transfers_subset.groupby("hadm_id", as_index=True).progress_apply(
-    #     lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_6))
+    outcomes_18_hours = transfers_subset.groupby("hadm_id", as_index=True).progress_apply(
+        lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_3))
+    outcomes_24_hours = transfers_subset.groupby("hadm_id", as_index=True).progress_apply(
+        lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_4))
+    outcomes_36_hours = transfers_subset.groupby("hadm_id", as_index=True).progress_apply(
+        lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_5))
+    outcomes_48_hours = transfers_subset.groupby("hadm_id", as_index=True).progress_apply(
+        lambda x: utils.select_death_icu_acute(x, admissions_subset, time_window_6))
 
     # # Ensure all patients have only one class
-    # assert outcomes_4_hours.iloc[:, :-1].sum(axis=1).eq(1).all()
-    # assert outcomes_12_hours.iloc[:, :-1].sum(axis=1).eq(1).all()
-    # assert outcomes_18_hours.iloc[:, :-1].sum(axis=1).eq(1).all()
-    # assert outcomes_24_hours.iloc[:, :-1].sum(axis=1).eq(1).all()
-    # assert outcomes_36_hours.iloc[:, :-1].sum(axis=1).eq(1).all()
-    # assert outcomes_48_hours.iloc[:, :-1].sum(axis=1).eq(1).all()
+    assert outcomes_4_hours.iloc[:, :-1].sum(axis=1).eq(1).all()
+    assert outcomes_12_hours.iloc[:, :-1].sum(axis=1).eq(1).all()
+    assert outcomes_18_hours.iloc[:, :-1].sum(axis=1).eq(1).all()
+    assert outcomes_24_hours.iloc[:, :-1].sum(axis=1).eq(1).all()
+    assert outcomes_36_hours.iloc[:, :-1].sum(axis=1).eq(1).all()
+    assert outcomes_48_hours.iloc[:, :-1].sum(axis=1).eq(1).all()
 
     """
     Final processing, ensure admissions and observations match with patient ids
@@ -156,12 +156,12 @@ def main():
     # Save for input
     vitals_final.to_csv(process_fd + "vitals_process.csv", index=True, header=True)
     admissions_final.to_csv(process_fd + "admissions_process.csv", index=True, header=True)
-    # outcomes_4_hours.to_csv(process_fd + "outcomes_4h_process.csv", index=True, header=True)
+    outcomes_4_hours.to_csv(process_fd + "outcomes_4h_process.csv", index=True, header=True)
     outcomes_12_hours.to_csv(process_fd + "outcomes_12h_process.csv", index=True, header=True)
-    # outcomes_18_hours.to_csv(process_fd + "outcomes_18h_process.csv", index=True, header=True)
-    # outcomes_24_hours.to_csv(process_fd + "outcomes_24h_process.csv", index=True, header=True)
-    # outcomes_36_hours.to_csv(process_fd + "outcomes_36h_process.csv", index=True, header=True)
-    # outcomes_48_hours.to_csv(process_fd + "outcomes_48h_process.csv", index=True, header=True)
+    outcomes_18_hours.to_csv(process_fd + "outcomes_18h_process.csv", index=True, header=True)
+    outcomes_24_hours.to_csv(process_fd + "outcomes_24h_process.csv", index=True, header=True)
+    outcomes_36_hours.to_csv(process_fd + "outcomes_36h_process.csv", index=True, header=True)
+    outcomes_48_hours.to_csv(process_fd + "outcomes_48h_process.csv", index=True, header=True)
 
 if __name__ == "__main__":
     main()

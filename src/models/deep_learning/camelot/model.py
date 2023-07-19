@@ -96,6 +96,7 @@ class CAMELOT(tf.keras.Model):
 
         self.Encoder = AttentionRNNEncoder(units=self.latent_dim, dropout=self.dropout,
                                            regulariser_params=self.regulariser, name="Encoder",
+                                           seed=self.seed,
                                            **self.encoder_params)
         self.Identifier = MLP(output_dim=self.K, dropout=self.dropout, output_fn="softmax",
                               regulariser_params=self.regulariser, seed=self.seed, name="Identifier",
@@ -429,11 +430,11 @@ class CAMELOT(tf.keras.Model):
 
         # Fit KMeans
         km = KMeans(n_clusters=self.K, init="k-means++", random_state=self.seed, **kwargs)
-        km.fit(y_pred)
+        km.fit(z)
         print("KMeans fit has completed.")
 
         # Make predictions and get predicted centers
-        cluster_pred = km.predict(y_pred)
+        cluster_pred = km.predict(z)
         _one_hot_clus_assign = np.eye(self.K)[cluster_pred]
 
         # Compute average of cluster assignments
@@ -449,7 +450,8 @@ class CAMELOT(tf.keras.Model):
 
         # Make predictions on validation data
         y_val = self.Predictor(self.Encoder(val_x)).numpy()
-        clus_val_y = np.eye(self.K)[km.predict(y_val)]
+        z_val = self.Encoder(val_x).numpy()
+        clus_val_y = np.eye(self.K)[km.predict(z_val)]
 
         return clus_train_y.astype(np.float32), clus_val_y.astype(np.float32)
 

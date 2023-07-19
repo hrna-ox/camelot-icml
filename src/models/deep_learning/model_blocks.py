@@ -7,6 +7,7 @@ import tensorflow as tf
 from tensorflow import linalg
 from tensorflow.keras.layers import Dense, Dropout, Layer, LSTM
 from tensorflow.keras.regularizers import l1_l2 as l1_l2_reg
+from tensorflow.keras.initializers import GlorotNormal, GlorotUniform
 
 
 # ------------ Utility Functions --------------
@@ -120,7 +121,8 @@ class MLP(Layer):
 
             # Add Dense layer to model
             layer_ = Dense(units=self.hidden_nodes, activation=self.activation_fn, kernel_regularizer=self.regulariser,
-                           activity_regularizer=self.regulariser)
+                           activity_regularizer=self.regulariser, kernel_initializer=GlorotNormal(seed=self.seed),
+                            bias_initializer=GlorotUniform(seed=self.seed))
 
             self.__setattr__('layer_' + str(layer_id_), layer_)
 
@@ -129,7 +131,9 @@ class MLP(Layer):
             self.__setattr__('dropout_layer_' + str(layer_id_), dropout_layer)
 
         # Input and Output layers
-        self.output_layer = Dense(units=self.output_dim, activation=self.output_fn)
+        self.output_layer = Dense(units=self.output_dim, activation=self.output_fn,
+                                  kernel_initializer=GlorotNormal(seed=self.seed),
+                                  bias_initializer=GlorotUniform(seed=self.seed))
 
     def call(self, inputs, training=True, **kwargs):
         """Forward pass of layer block."""
@@ -176,7 +180,7 @@ class FeatTimeAttention(Layer):
     name: str, the name on which to save the layer. (default = "custom_att_layer")
     """
 
-    def __init__(self, units: int, activation: str = "linear", name: str = "custom_layer"):
+    def __init__(self, units: int, activation: str = "linear", name: str = "custom_layer", seed: int =4347):
 
         # Load layer params
         super().__init__(name=name)
@@ -185,24 +189,28 @@ class FeatTimeAttention(Layer):
         self.units = units
         self.activation_name = activation
         self.activation = tf.keras.activations.get(activation)  # get activation from  identifier
+        self.seed = seed
 
         # Initialise layer weights to None
         self.kernel = None
         self.bias = None
         self.unnorm_beta_weights = None
 
+
     def build(self, input_shape=None):
         """Build method for the layer given input shape."""
         N, T, Df = input_shape
 
         # kernel, bias for feature -> latent space conversion
-        self.kernel = self.add_weight("kernel", shape=[1, 1, Df, self.units], initializer="glorot_uniform",
+        self.kernel = self.add_weight("kernel", shape=[1, 1, Df, self.units],
+                                      initializer=GlorotNormal(seed=self.seed),
                                       trainable=True)
-        self.bias = self.add_weight("bias", shape=[1, 1, Df, self.units], initializer='uniform', trainable=True)
+        self.bias = self.add_weight("bias", shape=[1, 1, Df, self.units],
+                                    initializer=GlorotUniform(self.seed), trainable=True)
 
         # Time aggregation learn weights
         self.unnorm_beta_weights = self.add_weight(name='time_agg', shape=[1, T, 1],
-                                                   initializer="uniform", trainable=True)
+                                                   initializer=GlorotUniform(seed=self.seed), trainable=True)
 
         super().build(input_shape)
 
@@ -346,7 +354,8 @@ class LSTMEncoder(Layer):
 
     def __init__(self, latent_dim: int = 32, hidden_layers: int = 1, hidden_nodes: int = 20, state_fn="tanh",
                  recurrent_fn="sigmoid", regulariser_params: tuple = (0.01, 0.01), return_sequences: bool = False,
-                 dropout: float = 0.6, recurrent_dropout: float = 0.0, name: str = 'LSTM_Encoder'):
+                 dropout: float = 0.6, recurrent_dropout: float = 0.0,
+                 seed: int = 4347, name: str = 'LSTM_Encoder'):
 
         # Block Parameters
         super().__init__(name=name)
@@ -362,6 +371,7 @@ class LSTMEncoder(Layer):
         self.recurrent_dropout = recurrent_dropout
         self.regulariser_params = regulariser_params
         self.regulariser = l1_l2_reg(*regulariser_params)
+        self.seed = seed
 
         # Add Intermediate Layers
         for layer_id_ in range(self.hidden_layers):
@@ -369,12 +379,16 @@ class LSTMEncoder(Layer):
                              LSTM(units=self.hidden_nodes, return_sequences=True, activation=self.state_fn,
                                   recurrent_activation=self.recurrent_fn, dropout=self.dropout,
                                   recurrent_dropout=self.recurrent_dropout,
+                                  kernel_initializer=GlorotNormal(seed=self.seed),
+                                  bias_initializer=GlorotUniform(seed=self.seed),
                                   kernel_regularizer=self.regulariser, recurrent_regularizer=self.regulariser,
                                   bias_regularizer=self.regulariser, return_state=False))
 
         self.output_layer = LSTM(units=self.latent_dim, activation=self.state_fn,
                                  recurrent_activation=self.recurrent_fn, return_sequences=self.return_sequences,
                                  dropout=self.dropout, recurrent_dropout=self.recurrent_dropout,
+                                 kernel_initializer=GlorotNormal(seed=self.seed),
+                                 bias_initializer=GlorotUniform(seed=self.seed),
                                  kernel_regularizer=self.regulariser, recurrent_regularizer=self.regulariser,
                                  bias_regularizer=self.regulariser, return_state=False)
 
@@ -414,9 +428,9 @@ class AttentionRNNEncoder(LSTMEncoder):
         Class for an Attention RNN Encoder architecture. Class builds on LSTM Encoder class.
     """
 
-    def __init__(self, units, activation="linear", **kwargs):
-        super().__init__(latent_dim=units, return_sequences=True, **kwargs)
-        self.feat_time_attention_layer = FeatTimeAttention(units=units, activation=activation)
+    def __init__(self, units, activation="linear", seed: int = 4347, **kwargs):
+        super().__init__(latent_dim=units, return_sequences=True, seed=seed, **kwargs)
+        self.feat_time_attention_layer = FeatTimeAttention(units=units, activation=activation, seed=seed)
 
     def call(self, x, mask=None, training: bool = True, **kwargs):
         """

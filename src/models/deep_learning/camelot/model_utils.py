@@ -152,7 +152,7 @@ def l_pat_dist(clusters_prob):
     """
 
     # Compute Entropy
-    entropy = - tf.reduce_sum(clusters_prob * tf_log(clusters_prob))
+    entropy = - tf.reduce_sum(clusters_prob * tf_log(clusters_prob), axis=-1)
 
     # Compute negative entropy
     batch_loss = tf.reduce_mean(entropy)

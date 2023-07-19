@@ -8,5 +8,5 @@
    ],
    "train_test_ratio": 0.6,
    "train_val_ratio": 0.4,
-   "seed": 2323
+   "seed": 4347
 }
