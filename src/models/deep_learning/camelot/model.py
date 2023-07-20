@@ -155,8 +155,10 @@ class CAMELOT(tf.keras.Model):
         pi = self.Identifier(z)
 
         # Sample from cluster assignments and assign corresponding cluster representations
-        clus_phens = self.Predictor(self.cluster_rep_set)
-        y_pred = tf.linalg.matmul(pi, clus_phens)
+        avg_z = tf.linalg.matmul(pi, self.cluster_rep_set)
+        y_pred = self.Predictor(avg_z)
+        # clus_phens = self.Predictor(self.cluster_rep_set)
+        # y_pred = tf.linalg.matmul(pi, clus_phens)
 
         return y_pred, pi
 
@@ -238,7 +240,7 @@ class CAMELOT(tf.keras.Model):
             l_dist = model_utils.l_dist(y_pred=y_pred, true_dist=loss_weights)
             l_pat_entr = model_utils.l_pat_dist(clusters_prob=pi)
             l_clus_entr = model_utils.l_clus_dist(clusters_prob=pi)
-            l_clus = model_utils.l_clus(clus_phens)
+            l_clus = model_utils.l_clus(self.cluster_rep_set)
 
             # Get loss
             loss = l_crit + self.alpha_1 * l_dist + self.alpha_2 * l_pat_entr + self.alpha_3 * l_clus_entr + \
@@ -249,8 +251,8 @@ class CAMELOT(tf.keras.Model):
         self.optimizer.apply_gradients(zip(all_grad, all_vars))
 
         # Return losses
-        return {"Loss": loss, "L_pred": l_crit, "l_dist": l_dist, "l_pat_entr": l_pat_entr, "l_clus_entr": l_clus_entr,
-                "L_clus": l_clus}
+        return {"Loss": loss, "L1": l_crit, "L2": l_dist, "L3": l_pat_entr, "L4": l_clus_entr,
+                "L5": l_clus}
 
     def test_step(self, inputs):
         """
@@ -277,15 +279,15 @@ class CAMELOT(tf.keras.Model):
         l_dist = model_utils.l_dist(y_pred=y_pred, true_dist=loss_weights)
         l_pat_entr = model_utils.l_pat_dist(clusters_prob=pi)
         l_clus_entr = model_utils.l_clus_dist(clusters_prob=pi)
-        l_clus = model_utils.l_clus(clus_phens)
+        l_clus = model_utils.l_clus(self.cluster_rep_set)
 
         # Get loss
         loss = l_crit + self.alpha_1 * l_dist + self.alpha_2 * l_pat_entr + self.alpha_3 * l_clus_entr + \
                self.beta * l_clus
 
         # Return losses
-        return {"Loss": loss, "L_pred": l_crit, "l_dist": l_dist, "l_pat_entr": l_pat_entr, "l_clus_entr": l_clus_entr,
-                "L_clus": l_clus}
+        return {"Loss": loss, "L1": l_crit, "L2": l_dist, "L3": l_pat_entr, "L4": l_clus_entr,
+                "L5": l_clus}
 
     # Initialisation Methods for Model Training
     def initialise_model(self, data: tuple, val_data: tuple, epochs_1: int = 100, epochs_2: int = 100,
@@ -380,7 +382,7 @@ class CAMELOT(tf.keras.Model):
                 epoch_loss += loss_batch
 
                 # Print current batch loss - clears line and re-writes
-                print("Batch Loss %.4f" % loss_batch, end="\r", flush=True)
+                print("Batch Loss %.2f" % loss_batch, end="\r", flush=True)
 
             # Take mean over whole data
             epoch_loss = epoch_loss / step_
@@ -400,7 +402,7 @@ class CAMELOT(tf.keras.Model):
 
             # Print result and update tracker
             self.enc_pred_loss_tracker.loc[epoch + 1, :] = [epoch_loss, val_loss]
-            print("End of epoch %d - \n Training loss: %.4f  Validation loss %.4f" % (epoch, epoch_loss, val_loss))
+            print("Tr Loss: %.2f  Val loss %.2f    | End of epoch %d " % (epoch_loss, val_loss, epoch))
 
             # Check if result hasn't improved for 2 epochs
             if epoch > patience_epochs and epochs > 20 and val_loss >= self.enc_pred_loss_tracker.iloc[-patience_epochs-20:-20, -1].min():
@@ -527,7 +529,7 @@ class CAMELOT(tf.keras.Model):
             val_loss = val_loss / val_step_
 
             # Print result and update tracker
-            print("End of epoch %d - \n Training loss: %.4f  Validation loss %.4f" % (epoch, epoch_loss, val_loss))
+            print("Tr Loss: %.4f  Val loss %.4f     | End of epoch %d" % (epoch_loss, val_loss, epoch))
             self.iden_loss_tracker.loc[epoch + 1, :] = [epoch_loss, val_loss]
 
             # Check if result hasn't improved for 2 epochs
@@ -691,7 +693,7 @@ class Model(CAMELOT):
                                                        other_cbcks=cbck_str, patience_epochs=patience_epochs,
                                                        early_stop=True, lr_scheduler=True, tensorboard=True)
 
-        # Update run num
+        # # Update run num
         self.run_num = run_num
         self.callback_lst = callbacks
 
@@ -746,7 +748,8 @@ class Model(CAMELOT):
 
         # Fit model
         history = self.fit(train_data, validation_data=val_data, epochs=epochs,
-                           verbose=2, callbacks=self.callback_lst)
+                           verbose=2)
+        # , callbacks=self.callback_lst)
 
         return history
 
@@ -805,6 +808,11 @@ class Model(CAMELOT):
         # Secondly, compute predicted cluster assignments
         pis_pred = pd.DataFrame(self.compute_pis(X_test), index=pat_ids, columns=cluster_names)
         clus_pred = pd.Series(self.clus_assign(X_test), index=pat_ids)
+        z_pred = pd.DataFrame(
+            data=tf.linalg.matmul(pis_pred, self.cluster_rep_set).numpy(),
+            index=pat_ids,
+            columns=list(range(1, self.latent_dim + 1))
+        )
 
         # Thirdly, compute cluster phenotype information
         clus_phenotypes = pd.DataFrame(self.compute_cluster_phenotypes(), index=cluster_names, columns=outc_dims)
@@ -828,6 +836,7 @@ class Model(CAMELOT):
         outc_pred.to_csv(save_fd + "outc_pred.csv", index=True, header=True)
         y_true.to_csv(save_fd + "y_true.csv", index=True, header=True)
         pis_pred.to_csv(save_fd + "pis_pred.csv", index=True, header=True)
+        z_pred.to_csv(save_fd + "z_pred.csv", index=True, header=True)
         clus_pred.to_csv(save_fd + "clus_pred.csv", index=True, header=True)
         clus_phenotypes.to_csv(save_fd + "clus_phenotypes.csv", index=True, header=True)
         np.save(save_fd + "cluster_representations", cluster_rep_set, allow_pickle=True)
@@ -857,7 +866,7 @@ class Model(CAMELOT):
         # Return objects
         outputs_dic = {
             "y_pred": y_pred, "class_pred": outc_pred, "y_true": y_true, "pis_pred": pis_pred, "clus_pred": clus_pred,
-            "clus_representations": cluster_rep_set, "clus_phenotypes": clus_phenotypes,
+            "clus_representations": cluster_rep_set, "clus_phenotypes": clus_phenotypes, "z_pred": z_pred,
             "init_loss_enc_pred": init_loss_1, "init_loss_iden": init_loss_2, "attention_unnorm": (alpha, beta, gamma),
             "attention_norm": (alpha_norm, beta_norm, gamma_norm), "logs": track_fd + "logs",
             "save_fd": save_fd, "model_config": self.model_config

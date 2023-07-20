@@ -12,6 +12,9 @@ import matplotlib.pyplot as plt
 
 from typing import Union, List
 
+import torch
+from torchmetrics import AveragePrecision
+
 from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
 from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score, confusion_matrix
 from sklearn.metrics import roc_auc_score, f1_score, recall_score, precision_score, average_precision_score
@@ -169,7 +172,7 @@ def purity(y_true: np.ndarray, clus_pred: np.ndarray) -> float:
 def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
     """
     Compute set of supervised classification scores between y_true and y_pred. List of metrics includes:
-    a) AUROC, b) Recall, c) F1, d) Precision, e) Adjusted Rand Index and f) Normalised Mutual Information Score.
+    a) AUROC, and AUPRC, e) Adjusted Rand Index and f) Normalised Mutual Information Score.
 
     Params:
     - y_true: array-like of shape (N, num_outcs) of one-hot encoded true class membership.
@@ -180,59 +183,68 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
     Returns:
         - Dictionary of performance scores:
             - "ROC-AUC": list of AUROC One vs Rest values.
-            - "Recall": List of Recall One vs Rest values.
-            - "F1": List of F1 score One vs Rest values.
-            - "Precision": List of Precision One vs Rest values.
             - "ARI": Float value indicating Adjusted Rand Index performance.
             - "NMI": Float value indicating Normalised Mutual Information Score performance.
     """
 
-    # Get PRC
+    # Get AUROC, AUPRC, ARI and NMI scores
     prc, auc = np.zeros(shape=y_pred.shape[-1]), np.zeros(shape=y_pred.shape[-1])
-    for outc_id in range(y_pred.shape[-1]):
+    labels_true = np.argmax(y_true, axis=1).astype(int)
 
-        # Update prc and auc scores
-        auc[outc_id] = roc_auc_score(y_true=y_true[:, outc_id], y_score=y_pred[:, outc_id], average=avg)
-        prc[outc_id] = average_precision_score(y_true=y_true[:, outc_id], y_score=y_pred[:, outc_id], average=avg)
+    # Compute Roc
+    ovr_roc_scores = roc_auc_score(labels_true, y_score=y_pred, average="weighted", multi_class="ovr")
 
-    # GET ROC AND PRC CURVES
-    roc_prc_curves = {}
-    for outc_id in range(y_pred.shape[-1]):
+    # Compute PRC
+    _prc_metric_wrapper = AveragePrecision(task="multiclass", num_classes=y_pred.shape[-1], average=None)
+    ovr_prc_scores = _prc_metric_wrapper(
+                                         torch.from_numpy(y_pred.reshape(-1, y_pred.shape[-1])),
+                                         torch.from_numpy(labels_true.reshape(-1))
+                                         ).detach().numpy()
 
-        # Add curve to map
-        fig, ax = plt.subplots(nrows=1, ncols=2)
-
-        RocCurveDisplay.from_predictions(y_true[:, outc_id], y_pred[:, outc_id], ax=ax[0])
-        PrecisionRecallDisplay.from_predictions(y_true[:, outc_id], y_pred[:, outc_id], ax=ax[1])
-
-        # Add info
-        ax[0].set_xlabel("FPR")
-        ax[0].set_ylabel("TPR")
-        ax[0].set_title(f"ROC Curve for outcome {outc_id}")
-
-        # Same for second ax
-        ax[1].set_xlabel("FPR")
-        ax[1].set_ylabel("TPR")
-        ax[1].set_title(f"PRC Curve for outcome {outc_id}")
-
-        # Add to curves
-        roc_prc_curves[outc_id] = fig, ax
-
-    # Compute custom AUROC and AUPRC
-    auc_common = custom_auc(y_true=y_true, y_score=y_pred)
-    prc_common = custom_prc(y_true=y_true, y_score=y_pred)
+    # for outc_id in range(y_pred.shape[-1]):
+    #
+    #     # Update prc and auc scores
+    #     auc[outc_id] = roc_auc_score(y_true=y_true[:, outc_id], y_score=y_pred[:, outc_id], average=avg)
+    #     prc[outc_id] = average_precision_score(y_true=y_true[:, outc_id], y_score=y_pred[:, outc_id], average=avg)
+    #
+    # # GET ROC AND PRC CURVES
+    # roc_prc_curves = {}
+    # for outc_id in range(y_pred.shape[-1]):
+    #
+    #     # Add curve to map
+    #     fig, ax = plt.subplots(nrows=1, ncols=2)
+    #
+    #     RocCurveDisplay.from_predictions(y_true[:, outc_id], y_pred[:, outc_id], ax=ax[0])
+    #     PrecisionRecallDisplay.from_predictions(y_true[:, outc_id], y_pred[:, outc_id], ax=ax[1])
+    #
+    #     # Add info
+    #     ax[0].set_xlabel("FPR")
+    #     ax[0].set_ylabel("TPR")
+    #     ax[0].set_title(f"ROC Curve for outcome {outc_id}")
+    #
+    #     # Same for second ax
+    #     ax[1].set_xlabel("FPR")
+    #     ax[1].set_ylabel("TPR")
+    #     ax[1].set_title(f"PRC Curve for outcome {outc_id}")
+    #
+    #     # Add to curves
+    #     roc_prc_curves[outc_id] = fig, ax
+    #
+    # # Compute custom AUROC and AUPRC
+    # auc_common = custom_auc(y_true=y_true, y_score=y_pred)
+    # prc_common = custom_prc(y_true=y_true, y_score=y_pred)
 
     # Convert input arrays to categorical labels
     labels_true, labels_pred = np.argmax(y_true, axis=1), np.argmax(y_pred, axis=1)
 
-    # Compute F1
-    f1 = f1_score(labels_true, labels_pred, average=avg)
-
-    # Compute Recall
-    rec = recall_score(labels_true, labels_pred, average=avg)
-
-    # Compute Precision
-    prec = precision_score(labels_true, labels_pred, average=avg)
+    # # Compute F1
+    # f1 = f1_score(labels_true, labels_pred, average=avg)
+    #
+    # # Compute Recall
+    # rec = recall_score(labels_true, labels_pred, average=avg)
+    #
+    # # Compute Precision
+    # prec = precision_score(labels_true, labels_pred, average=avg)
 
     # Compute ARI
     ari = adjusted_rand_score(labels_true, labels_pred)
@@ -240,21 +252,22 @@ def compute_supervised_scores(y_true: np.ndarray, y_pred: np.ndarray, avg=None):
     # Compute NMI
     nmi = normalized_mutual_info_score(labels_true, labels_pred)
 
-    # Compute Confusion matrix
+    # # Compute Confusion matrix
     cm = confusion_matrix(y_true=labels_true, y_pred=labels_pred, labels=None, sample_weight=None, normalize=None)
 
     # Return Dictionary
     scores_dic = {
-        "ROC-AUC": auc,
-        "ROC-PRC": prc,
-        "F1": f1,
-        "Recall": rec,
-        "Precision": prec,
+        "ROC-AUC": ovr_roc_scores,
+        "ROC-PRC": ovr_prc_scores,
+        # "F1": f1,
+        # "Recall": rec,
+        # "Precision": prec,
         "ARI": ari,
         "NMI": nmi
     }
 
-    return scores_dic, cm, RocCurveDisplay
+    # return scores_dic, cm, RocCurveDisplay
+    return scores_dic
 
 
 def compute_from_eas_scores(y_true: np.ndarray, scores: np.ndarray, outc_names: np.ndarray = None, **kwargs) -> dict:
@@ -335,10 +348,13 @@ def compute_cluster_performance(X, clus_pred, y_true):
     # Compute the same taking average over each feature dimension
     sil_avg, dbi_avg, vri_avg = 0, 0, 0
 
-    for feat in range(X.shape[-1]):
-        sil_avg += silhouette_score(X[:, :, feat], clus_pred, metric="euclidean")
-        dbi_avg += davies_bouldin_score(X[:, :, feat], clus_pred)
-        vri_avg += calinski_harabasz_score(X[:, :, feat], clus_pred)
+    # for feat in range(X.shape[-1]):
+    #     sil_avg += silhouette_score(X[:, :, feat], clus_pred, metric="euclidean")
+    #     dbi_avg += davies_bouldin_score(X[:, :, feat], clus_pred)
+    #     vri_avg += calinski_harabasz_score(X[:, :, feat], clus_pred)
+    sil = silhouette_score(X, clus_pred, metric="euclidean")
+    dbi = davies_bouldin_score(X, clus_pred)
+    vri = calinski_harabasz_score(X, clus_pred)
 
     # Compute Purity Score
     purity_score = purity(y_true, clus_pred)
@@ -346,12 +362,19 @@ def compute_cluster_performance(X, clus_pred, y_true):
     # Compute average factor
     num_feats = X.shape[-1]
 
+    # # Return Dictionary
+    # clus_perf_dic = {
+    #     "Silhouette": sil_avg / num_feats,
+    #     "DBI": dbi_avg / num_feats,
+    #     "VRI": vri_avg / num_feats,
+    #     "Purity": purity_score / num_feats
+    # }
     # Return Dictionary
     clus_perf_dic = {
-        "Silhouette": sil_avg / num_feats,
-        "DBI": dbi_avg / num_feats,
-        "VRI": vri_avg / num_feats,
-        "Purity": purity_score / num_feats
+        "Silhouette": sil_avg,
+        "DBI": dbi_avg,
+        "VRI": vri_avg,
+        "Purity": purity_score
     }
 
     return clus_perf_dic

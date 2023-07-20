@@ -1,28 +1,36 @@
 {
-   "model_name": "camelot",
-   "num_clusters": 10,
-   "latent_dim": 64,
+   "model_name": "SVMFeat",
+   "num_clusters": 6,
+   "latent_dim": 16,
    "seed": 2323,
-   "name": "CAMELOT",
-   "alpha_1": 0.1,
-   "alpha_2": 0.01,
-   "alpha_3": 0.1,
-   "beta": 1,
+   "name": "SVM",
+   "alpha_1": 0,
+   "alpha_2": 0.0,
+   "alpha_3": 0.01,
+   "beta": 0.5,
    "regulariser_params": [
-      0.5,
-      0.5
+      0.2,
+      0.2
    ],
    "dropout": 0.5,
    "encoder_params": {
-      "hidden_layers": 2,
-      "hidden_nodes": 50
+      "hidden_layers": 1,
+      "hidden_nodes": 20
    },
    "identifier_params": {
-      "hidden_layers": 2,
-      "hidden_nodes": 50
+      "hidden_layers": 1,
+      "hidden_nodes": 20
    },
    "predictor_params": {
-      "hidden_layers": 2,
-      "hidden_nodes": 50
-   }
+      "hidden_layers": 5,
+      "hidden_nodes": 20
+   },
+   "n_estimators": 300,
+   "max_depth": 20,
+   "objective": "multi:softmax",
+   "gamma": 0.1,
+   "learning_rate": 0.1,
+   "enable_categorical": true,
+   "C": 1.0,
+   "kernel": "rbf"
 }

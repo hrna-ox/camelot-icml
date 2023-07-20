@@ -828,6 +828,11 @@ class Model(ACTPC):
         # Secondly, compute predicted cluster assignments
         pis_pred = pd.DataFrame(self.compute_pis(X_test), index=pat_ids, columns=cluster_names)
         clus_pred = pd.Series(self.clus_assign(X_test), index=pat_ids)
+        z_s = pd.DataFrame(
+            data = tf.linalg.matmul(pis_pred, self.cluster_rep_set).numpy(),
+            index = pat_ids,
+            columns = list(range(1, self.latent_dim + 1))
+        )
 
         # Thirdly, compute cluster phenotype information
         clus_phenotypes = pd.DataFrame(self.compute_cluster_phenotypes(), index=cluster_names, columns=outc_dims)
@@ -848,6 +853,7 @@ class Model(ACTPC):
         y_true.to_csv(save_fd + "y_true.csv", index=True, header=True)
         pis_pred.to_csv(save_fd + "pis_pred.csv", index=True, header=True)
         clus_pred.to_csv(save_fd + "clus_pred.csv", index=True, header=True)
+        z_s.to_csv(save_fd + "z_s.csv", index=True, header=True)
         clus_phenotypes.to_csv(save_fd + "clus_phenotypes.csv", index=True, header=True)
         np.save(save_fd + "cluster_representations", cluster_rep_set, allow_pickle=True)
 

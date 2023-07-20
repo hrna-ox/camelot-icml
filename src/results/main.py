@@ -15,7 +15,7 @@ import pandas as pd
 import src.results.results_utils as utils
 
 
-def evaluate(y_true=None, y_pred=None, clus_pred=None, data_info=None, save_fd=None, avg=None, scores=None,
+def evaluate(y_true=None, y_pred=None, clus_pred=None, data_info=None, save_fd=None, avg=None, scores=None, z_pred=None,
              **kwargs):
     """
     Evaluate function to print result information given results and/or experiment ids. Returns a dictionary of scores
@@ -63,15 +63,16 @@ def evaluate(y_true=None, y_pred=None, clus_pred=None, data_info=None, save_fd=N
         outc_names = data_properties["outc_names"]
 
         # Compute scores and confusion matrix
-        scores, cm, Roc_curves = utils.compute_supervised_scores(y_true, y_pred, avg=avg)
+        # scores, cm, Roc_curves = utils.compute_supervised_scores(y_true, y_pred, avg=avg)
+        scores = utils.compute_supervised_scores(y_true, y_pred, avg=avg)
 
         # Convert Confusion Matrix to pdDataFrame
-        cm = pd.DataFrame(cm, index=pd.Index(data=outc_names, name="True Class"),
-                          columns=pd.Index(data=outc_names, name="Predicted Class"))
+        # cm = pd.DataFrame(cm, index=pd.Index(data=outc_names, name="True Class"),
+        #                   columns=pd.Index(data=outc_names, name="Predicted Class"))
 
         # If clustering results exist, output cluster performance scores
         clus_metrics = {}
-        if clus_pred is not None:
+        if clus_pred is not None and z_pred is not None:
 
             if isinstance(clus_pred, pd.DataFrame):
                 clus_pred = clus_pred.values
@@ -82,13 +83,13 @@ def evaluate(y_true=None, y_pred=None, clus_pred=None, data_info=None, save_fd=N
 
             # Compute metrics
             try:
-                clus_metrics = utils.compute_cluster_performance(x_test_3d, clus_pred=clus_pred, y_true=y_true)
+                clus_metrics = utils.compute_cluster_performance(z_pred, clus_pred=clus_pred, y_true=y_true)
             except ValueError:
                 print("Too little predicted labels. Can't compute clustering metrics.")
                 clus_metrics = {}
 
-        # Save Confusion matrix
-        cm.to_csv(save_fd + "confusion_matrix.csv", index=True, header=True)
+        # # Save Confusion matrix
+        # cm.to_csv(save_fd + "confusion_matrix.csv", index=True, header=True)
 
     # Jointly compute scores
     scores = {**scores, **clus_metrics}
@@ -120,6 +121,6 @@ def evaluate(y_true=None, y_pred=None, clus_pred=None, data_info=None, save_fd=N
     for key, value in scores.items():
         print(f"{key} value: {value}")
 
-    print("\nConfusion Matrix for predicting results", cm, sep="\n")
+    # print("\nConfusion Matrix for predicting results", cm, sep="\n")
 
     return scores

@@ -6,12 +6,25 @@ Author: Henrique Aguiar
 Please contact via henrique.aguiar@eng.ox.ac.uk
 """
 import json
+import os
+
 import matplotlib.pyplot as plt
 
 from src.data_processing.data_loader import data_loader
 import src.models.model_utils as model_utils
 from src.results.main import evaluate
 import src.visualisation.main as vis_main
+
+# Ignore warnings
+import warnings
+warnings.filterwarnings("ignore")
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' # 0: for all logs, 1: no info, 2: no warning, 3: no error
+
+# Printing formats
+import numpy as np
+import pandas as pd
+np.set_printoptions(precision=3)
+pd.set_option("display.float_format", lambda x: '%.3f' % x)
 
 
 def main():
@@ -34,7 +47,7 @@ def main():
     data_info = data_loader(**data_config)
 
     "Visualise Data Properties"
-    vis_main.visualise_data_groups(data_info)
+    # vis_main.visualise_data_groups(data_info)
 
     # -------------------------- Loading and Training Model -----------------------------
 
@@ -48,7 +61,6 @@ def main():
 
     "Compute results on test data"
     outputs_dic = model.analyse(data_info)
-    print(outputs_dic.keys())
 
     # -------------------------------------- Evaluate Scores --------------------------------------
 
@@ -65,16 +77,16 @@ def main():
     vis_main.plot_losses(history=history, **outputs_dic, data_info=data_info)
 
     # "Clus assignments where relevant"
-    vis_main.visualise_cluster_assignment(**outputs_dic, data_info=data_info)
+    # vis_main.visualise_cluster_assignment(**outputs_dic, data_info=data_info)
 
     # "Attention maps where relevant"
-    vis_main.visualise_attention_maps(**outputs_dic, data_info=data_info)
+    # vis_main.visualise_attention_maps(**outputs_dic, data_info=data_info)
 
     # Load tensorboard if exists
-    vis_main.load_tensorboard(**outputs_dic, data_info=data_info)
+    # vis_main.load_tensorboard(**outputs_dic, data_info=data_info)
 
     # Show Figures
-    plt.show(block=False)
+    # plt.show(block=False)
 
     print("Analysis Complete.")
 
